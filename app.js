@@ -46,151 +46,25 @@ const analyzer = {
     planningDebt: ["forgot", "missed", "behind", "bounced between", "rushed", "started three tasks"],
   },
 
-  analyzeDay(log, history, planInput) {
-    const normalized = log.toLowerCase();
-    const features = this.detectFeatures(normalized);
-    const metrics = this.computeMetrics(features, planInput);
-    const severity = this.computeSeverity(metrics);
-    const confidence = this.computeConfidence(features, normalized, planInput);
-    const timeLeaks = this.buildTimeLeaks(features, metrics);
-    const burnoutSignals = this.buildBurnoutSignals(features, metrics);
-    const rootCauses = this.buildRootCauses(features);
-    const behaviorPatches = this.buildBehaviorPatches(planInput);
-    const summary = this.buildSummary(features, severity);
-    const timeline = this.buildFailureTimeline(features, metrics);
-    const tomorrowPlan = this.buildTomorrowPlan(planInput, features);
-    const trend = this.buildTrend(rootCauses, history, "autopsy");
-    const failurePoint = this.buildFailurePoint(features, metrics);
-
-    return {
-      id: createId(),
-      type: "autopsy",
-      createdAt: new Date().toISOString(),
-      rawLog: log.trim(),
-      severity,
-      confidence,
-      summary,
-      timeLeaks,
-      burnoutSignals,
-      rootCauses,
-      behaviorPatches,
-      timeline,
-      tomorrowPlan,
-      trend,
-      metrics,
-      failurePoint,
-      planner: planInput,
-    };
+  splitList(value = "") {
+    return value
+      .split(/[,\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
   },
 
-  analyzeTomorrow(planInput, history) {
-    const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
-    const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
-    const usableMinutes = Math.max(540, endMinutes - wakeMinutes);
-    const deepWorkStart = wakeMinutes + 45;
-    const middayReset = wakeMinutes + 300;
-    const shutdown = Math.max(wakeMinutes + 720, endMinutes - 45);
-    const focusHours = Math.max(2.5, Math.min(7.5, (usableMinutes - 240) / 60));
-    const priorityCount = this.splitList(planInput.priorities).length;
-    const scheduleItems = this.splitList(planInput.schedule).length;
-    const planQuality = Math.min(96, 48 + priorityCount * 9 + scheduleItems * 7 + (focusHours - 2) * 4);
+  timeToMinutes(value = "07:30") {
+    const [h, m] = value.split(":").map(Number);
+    return h * 60 + m;
+  },
 
-    const suggestedSchedule = [
-      {
-        title: `${planInput.wakeTime || "07:30"} | Wake, fuel, and orient`,
-        detail:
-          "Use the first 30 minutes for water, food, and deciding the first priority. Do not let messages or scrolling occupy this slot.",
-      },
-      {
-        title: `${this.minutesToClock(deepWorkStart)} | Primary deep-work block`,
-        detail: priorityCount
-          ? `Start with ${this.splitList(planInput.priorities)[0]}. This should be the cleanest cognitive block of the day.`
-          : "Reserve this block for the hardest task before lower-value noise enters the day.",
-      },
-      {
-        title: `${this.minutesToClock(middayReset)} | Midday reset`,
-        detail:
-          "Break, eat, and decide the next work lane deliberately. This prevents the afternoon from becoming reactive.",
-      },
-      {
-        title: `${this.minutesToClock(shutdown)} | Shutdown window`,
-        detail:
-          "Close loops, list carryover tasks, and decide tomorrow’s first move before ending the day.",
-      },
-    ];
-
-    const priorityPlan = this.splitList(planInput.priorities).length
-      ? this.splitList(planInput.priorities).slice(0, 4).map((priority, index) => ({
-          title: `Priority ${index + 1} | ${priority}`,
-          detail:
-            index === 0
-              ? "Put this in the first deep-work block."
-              : index === 1
-                ? "Handle this after the midday reset."
-                : "Keep this in a later, lower-energy slot or batch it with admin work.",
-        }))
-      : [
-          {
-            title: "No priorities entered",
-            detail: "Add 2 to 4 concrete priorities so the planner can schedule a tighter day.",
-          },
-        ];
-
-    const efficiencyRules = [
-      {
-        title: "Rule 1 | Protect the first hour",
-        detail: "No phone drift before your first planned block starts.",
-      },
-      {
-        title: "Rule 2 | One lane at a time",
-        detail: "Use one clear work lane per block instead of mixing assignments or tasks.",
-      },
-      {
-        title: "Rule 3 | Schedule the reset before you need it",
-        detail: "The midday break should exist in the plan before energy drops.",
-      },
-    ];
-
-    const notes = [
-      {
-        title: `Focus capacity | ${focusHours.toFixed(1)} hours`,
-        detail: "This is the estimated amount of realistic focused work your schedule can hold without turning the whole day into strain.",
-      },
-      {
-        title: `Commitment load | ${scheduleItems} fixed item${scheduleItems === 1 ? "" : "s"}`,
-        detail:
-          scheduleItems > 0
-            ? "Your fixed commitments reduce flexibility, so the first deep-work window becomes more valuable."
-            : "Your day is flexible, which means structure matters even more because nothing external will impose it.",
-      },
-      {
-        title: "Planning logic",
-        detail:
-          "The planner front-loads hard work, inserts a reset before the afternoon, and uses a shutdown window so tomorrow does not begin in friction.",
-      },
-    ];
-
-    return {
-      id: createId(),
-      type: "planner",
-      createdAt: new Date().toISOString(),
-      planner: planInput,
-      summary:
-        priorityCount > 0
-          ? `Tomorrow should start earlier in intention than in effort: lock the first hour, start with ${this.splitList(planInput.priorities)[0]}, and avoid letting fixed commitments scatter your attention.`
-          : "Tomorrow needs a stronger structure first: set 2 to 4 priorities, protect the first hour, and use fixed commitments as anchors instead of letting them fragment the day.",
-      planQuality,
-      focusHours,
-      bestStartWindow: this.minutesToClock(deepWorkStart),
-      bestStartWhy:
-        "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
-      shutdownTime: this.minutesToClock(shutdown),
-      suggestedSchedule,
-      priorityPlan,
-      efficiencyRules,
-      notes,
-      trend: this.buildTrend([], history, "planner"),
-    };
+  minutesToClock(minutes) {
+    const normalized = ((minutes % 1440) + 1440) % 1440;
+    const h = Math.floor(normalized / 60);
+    const m = normalized % 60;
+    const suffix = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
   },
 
   detectFeatures(text) {
@@ -211,32 +85,48 @@ const analyzer = {
     };
   },
 
-  splitList(value) {
-    return value
-      .split(/[,\n]/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+  buildTrend(rootCauses, history, type) {
+    const sameType = history.filter((item) => item.type === type);
+    if (!sameType.length) {
+      return {
+        title: "No trend yet",
+        body:
+          type === "planner"
+            ? "Planner history starts once you generate a few tomorrow schedules."
+            : "One report is enough for diagnosis, but not enough to confirm a repeating failure mode.",
+      };
+    }
+
+    if (type === "planner") {
+      return {
+        title: "Planner history active",
+        body: `You now have ${sameType.length + 1} planning runs including this one. Reuse the planner to compare better structures over time.`,
+      };
+    }
+
+    const currentPrimary = rootCauses[0]?.title;
+    const repeatCount = sameType.filter(
+      (item) => item.rootCauses?.[0]?.title === currentPrimary
+    ).length;
+
+    if (repeatCount >= 2) {
+      return {
+        title: "Repeat pattern detected",
+        body: `The top failure mode has appeared ${repeatCount + 1} times including today. This is behaving like a system issue, not a one-off miss.`,
+      };
+    }
+
+    return {
+      title: "Pattern still forming",
+      body: "The app sees some consistency, but not enough history yet to call it a dominant pattern.",
+    };
   },
 
-  timeToMinutes(value) {
-    const [h, m] = value.split(":").map(Number);
-    return h * 60 + m;
-  },
-
-  minutesToClock(minutes) {
-    const normalized = ((minutes % 1440) + 1440) % 1440;
-    const h = Math.floor(normalized / 60);
-    const m = normalized % 60;
-    const suffix = h >= 12 ? "PM" : "AM";
-    const hour12 = h % 12 || 12;
-    return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
-  },
-
-  computeMetrics(features, planInput) {
+  analyzeDay(log, history, planInput) {
+    const normalized = log.toLowerCase();
+    const features = this.detectFeatures(normalized);
     const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
     const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
-    const dayLength = Math.max(600, endMinutes - wakeMinutes);
-
     const scrollCost = (features.phoneDrift ? 28 : 8) + (features.lateStart ? 10 : 0);
     const planningDebt =
       (features.planningDebt ? 26 : 10) +
@@ -246,331 +136,303 @@ const analyzer = {
       (features.nutritionDebt ? 24 : 8) +
       (features.stress ? 20 : 6) +
       (features.fatigue ? 18 : 4);
-
-    let firstFailureMinute = wakeMinutes + 30;
-    if (features.phoneDrift) firstFailureMinute = wakeMinutes + 40;
-    else if (features.lateStart) firstFailureMinute = wakeMinutes + 20;
-    else if (features.contextSwitching) firstFailureMinute = wakeMinutes + 150;
-    else if (features.nutritionDebt) firstFailureMinute = wakeMinutes + 240;
-
-    const focusRecoveryWindow = Math.max(45, Math.round((dayLength - scrollCost - planningDebt) / 8));
-
-    return {
-      wakeMinutes,
-      endMinutes,
-      dayLength,
-      scrollCost,
-      planningDebt,
-      energyStrain,
-      firstFailureMinute,
-      focusRecoveryWindow,
-      taskSwitchPenalty: features.contextSwitching ? 24 : 8,
-    };
-  },
-
-  computeSeverity(metrics) {
-    return Math.min(
-      97,
-      28 +
-        metrics.scrollCost * 0.7 +
-        metrics.planningDebt * 0.55 +
-        metrics.energyStrain * 0.62 +
-        metrics.taskSwitchPenalty * 0.4
+    const severity = Math.min(97, 28 + scrollCost * 0.7 + planningDebt * 0.55 + energyStrain * 0.62);
+    const confidence = Math.min(
+      0.95,
+      0.63 +
+        (features.longLog ? 0.08 : 0) +
+        (features.phoneDrift ? 0.07 : 0) +
+        (features.contextSwitching ? 0.08 : 0) +
+        (features.stress ? 0.06 : 0) +
+        (normalized.includes("felt") ? 0.04 : 0)
     );
-  },
+    const firstFailureMinute = features.phoneDrift
+      ? wakeMinutes + 40
+      : features.lateStart
+        ? wakeMinutes + 20
+        : features.contextSwitching
+          ? wakeMinutes + 150
+          : wakeMinutes + 90;
 
-  computeConfidence(features, text, planInput) {
-    let score = 0.63;
-    if (features.longLog) score += 0.08;
-    if (features.phoneDrift) score += 0.07;
-    if (features.contextSwitching) score += 0.08;
-    if (features.stress) score += 0.06;
-    if (text.includes("felt")) score += 0.04;
-    if (planInput.schedule || planInput.priorities) score += 0.03;
-    return Math.min(0.95, score);
-  },
-
-  buildTimeLeaks(features, metrics) {
-    const list = [];
-
-    if (features.phoneDrift) {
-      list.push({
-        title: `Reactive screen drift (+${metrics.scrollCost} drag points)`,
-        detail:
-          "The first usable minutes of the day were spent consuming input instead of stabilizing direction, so the day started from reaction mode.",
-      });
-    }
-
-    if (features.contextSwitching) {
-      list.push({
-        title: `Task-fragmented work blocks (+${metrics.taskSwitchPenalty} restart penalty)`,
-        detail:
-          "Repeated reopening and switching created restart costs, which made the workload feel larger than it actually was.",
-      });
-    }
-
-    list.push({
-      title: `Planning debt (+${metrics.planningDebt} friction points)`,
-      detail:
-        "A weak or missing day shape meant the next task had to be re-decided too often, which silently burned attention.",
-    });
-
-    return list.slice(0, 3);
-  },
-
-  buildBurnoutSignals(features, metrics) {
-    return [
+    const rootCauses = [
       {
-        title: features.nutritionDebt ? "Energy support broke early" : "Energy support looks unstable",
+        title: features.phoneDrift || features.lateStart ? "Unprotected start-of-day ramp" : "Weak early structure",
         detail:
-          "Skipping meals or delaying recovery tends to make late-day focus problems feel like a character issue instead of a fuel issue.",
+          "The first hour was too easy to hijack, so the rest of the day inherited weaker focus and pacing.",
       },
       {
-        title: features.stress ? "Language of overload" : "Stress is likely compounding friction",
-        detail:
-          "Words like fried, useless, or overwhelmed usually signal strain accumulation rather than one isolated mistake.",
+        title: features.contextSwitching || features.urgency ? "No stable execution lane" : "Over-flexible task switching",
+        detail: "Without a visible lane, each interruption or open tab became a new candidate for attention.",
       },
       {
-        title: `Accumulated energy strain (${metrics.energyStrain}/50)`,
-        detail:
-          "The app sees mounting pressure from low fuel, urgency, and declining executive control by late day.",
-      },
-    ];
-  },
-
-  buildRootCauses(features) {
-    const causes = [];
-
-    if (features.phoneDrift || features.lateStart) {
-      causes.push({
-        title: "Unprotected start-of-day ramp",
-        detail:
-          "Your first hour was too easy to hijack, so the rest of the day inherited a weaker baseline for focus and pacing.",
-      });
-    }
-
-    if (features.contextSwitching || features.urgency) {
-      causes.push({
-        title: "No stable execution lane",
-        detail:
-          "Without a defined lane, each interruption or open tab became a new candidate for attention.",
-      });
-    }
-
-    if (features.nutritionDebt || features.stress || features.fatigue) {
-      causes.push({
         title: "Physical depletion amplified mental noise",
-        detail:
-          "The breakdown was not only organizational. Low fuel and strain made ordinary friction much more expensive.",
-      });
-    }
-
-    while (causes.length < 3) {
-      causes.push({
-        title: "Feedback loop of inconsistency",
-        detail:
-          "Small slips stacked into a self-confirming story that the day was off, which made recovery less likely.",
-      });
-    }
-
-    return causes.slice(0, 3);
-  },
-
-  buildBehaviorPatches(planInput) {
-    return [
-      {
-        title: "Lock the first 30 minutes",
-        detail:
-          "Keep your phone out of reach until you have water, food, and one written first task. Prevent passive input before active intent.",
-      },
-      {
-        title: "Run one visible work lane",
-        detail:
-          "Pick a single 45-minute priority block, close all non-task tabs, and keep a scratchpad for distractions instead of switching immediately.",
-      },
-      {
-        title: `Pre-load tomorrow by ${planInput.wakeTime || "07:30"}`,
-        detail:
-          "Define the wake time, your first work block, and one midday energy checkpoint tonight so tomorrow starts with structure already installed.",
+        detail: "Low fuel and rising strain made normal friction more expensive than it should have been.",
       },
     ];
-  },
-
-  buildSummary(features, severity) {
-    if (features.phoneDrift && features.contextSwitching) {
-      return `The day likely failed at the transition from intention to execution: the first hour drifted, then the rest of the day fractured. Severity ${Math.round(severity)}/100.`;
-    }
-
-    if (features.nutritionDebt && features.stress) {
-      return `This looks less like laziness and more like depletion: low physical support made the afternoon collapse feel sharper than the workload alone would explain. Severity ${Math.round(severity)}/100.`;
-    }
-
-    return `The main pattern was unstable focus under rising strain, which turned normal work into a cascade of friction by mid to late day. Severity ${Math.round(severity)}/100.`;
-  },
-
-  buildFailureTimeline(features, metrics) {
-    return [
-      {
-        title: `${this.minutesToClock(metrics.wakeMinutes)} | Day setup window`,
-        detail: features.lateStart
-          ? "The day began behind schedule, which shrank the margin for calm setup immediately."
-          : "This was the best window to set direction before the day got noisy.",
-      },
-      {
-        title: `${this.minutesToClock(metrics.firstFailureMinute)} | Likely first break point`,
-        detail: features.phoneDrift
-          ? `Phone drift likely consumed the first planning block and cost about ${metrics.scrollCost} focus points.`
-          : "Early structure appears to have broken here, which made later choices more reactive.",
-      },
-      {
-        title: `${this.minutesToClock(metrics.firstFailureMinute + 180)} | Compounding phase`,
-        detail:
-          "By this point the app sees planning debt and task switching interacting, so recovery required more effort than prevention would have.",
-      },
-      {
-        title: `${this.minutesToClock(metrics.endMinutes - 120)} | Fatigue zone`,
-        detail:
-          `Late-day control likely weakened here. Estimated recovery window remaining: ${metrics.focusRecoveryWindow} usable minutes.`,
-      },
-    ];
-  },
-
-  buildFailurePoint(features, metrics) {
-    if (features.phoneDrift) {
-      return {
-        moment: `${this.minutesToClock(metrics.firstFailureMinute)}: screen drift displaced day setup`,
-        why: "The first high-leverage decision window was lost to passive scrolling, which made the rest of the day reactive instead of directed.",
-      };
-    }
-
-    if (features.lateStart) {
-      return {
-        moment: `${this.minutesToClock(metrics.firstFailureMinute)}: late wake-up compressed the day`,
-        why: "Waking late likely triggered urgency before the day had structure, so execution started from catch-up mode.",
-      };
-    }
 
     return {
-      moment: `${this.minutesToClock(metrics.firstFailureMinute)}: planning debt started to show`,
-      why: "The day appears to have drifted once tasks stopped being pre-decided and attention had to keep renegotiating priorities.",
+      id: createId(),
+      type: "autopsy",
+      createdAt: new Date().toISOString(),
+      rawLog: log.trim(),
+      planner: planInput,
+      severity,
+      confidence,
+      summary:
+        features.phoneDrift && features.contextSwitching
+          ? `The day likely failed at the transition from intention to execution: the first hour drifted, then the rest of the day fractured. Severity ${Math.round(severity)}/100.`
+          : `The main pattern was unstable focus under rising strain, which turned normal work into a cascade of friction by mid to late day. Severity ${Math.round(severity)}/100.`,
+      failurePoint: {
+        moment: features.phoneDrift
+          ? `${this.minutesToClock(firstFailureMinute)}: screen drift displaced day setup`
+          : features.lateStart
+            ? `${this.minutesToClock(firstFailureMinute)}: late wake-up compressed the day`
+            : `${this.minutesToClock(firstFailureMinute)}: planning debt started to show`,
+        why: features.phoneDrift
+          ? "The first high-leverage decision window was lost to passive scrolling, which made the rest of the day reactive instead of directed."
+          : "The day appears to have drifted once tasks stopped being pre-decided and attention had to keep renegotiating priorities.",
+      },
+      metrics: { scrollCost, planningDebt, energyStrain },
+      timeLeaks: [
+        {
+          title: `Reactive screen drift (+${scrollCost} drag points)`,
+          detail: "The first usable minutes of the day were spent consuming input instead of stabilizing direction.",
+        },
+        {
+          title: `Planning debt (+${planningDebt} friction points)`,
+          detail: "A weak or missing day shape forced the next task to be re-decided too often.",
+        },
+        {
+          title: features.contextSwitching ? "Task-fragmented work blocks" : "Diffuse attention leakage",
+          detail: features.contextSwitching
+            ? "Repeated reopening and switching created restart costs that made the workload feel larger."
+            : "The day spread effort too thinly, which quietly drained attention.",
+        },
+      ],
+      burnoutSignals: [
+        {
+          title: features.nutritionDebt ? "Energy support broke early" : "Energy support looks unstable",
+          detail: "Skipping meals or delaying recovery tends to make late-day focus problems feel like a character issue instead of a fuel issue.",
+        },
+        {
+          title: features.stress ? "Language of overload" : "Stress is compounding friction",
+          detail: "Words like fried, useless, or overwhelmed usually signal strain accumulation rather than a single bad task.",
+        },
+        {
+          title: `Accumulated energy strain (${energyStrain}/50)`,
+          detail: "The app sees mounting pressure from low fuel, urgency, and declining control by late day.",
+        },
+      ],
+      rootCauses,
+      behaviorPatches: [
+        {
+          title: "Lock the first 30 minutes",
+          detail: "Keep your phone out of reach until you have water, food, and one written first task.",
+        },
+        {
+          title: "Run one visible work lane",
+          detail: "Pick a single 45-minute priority block and avoid switching tasks mid-block.",
+        },
+        {
+          title: `Pre-load tomorrow by ${planInput.wakeTime || "07:30"}`,
+          detail: "Define the wake time, your first work block, and one energy checkpoint tonight.",
+        },
+      ],
+      timeline: [
+        {
+          title: `${this.minutesToClock(wakeMinutes)} | Day setup window`,
+          detail: features.lateStart
+            ? "The day began behind schedule, which shrank the margin for calm setup immediately."
+            : "This was the best window to set direction before the day got noisy.",
+        },
+        {
+          title: `${this.minutesToClock(firstFailureMinute)} | Likely first break point`,
+          detail: features.phoneDrift
+            ? `Phone drift likely consumed the first planning block and cost about ${scrollCost} focus points.`
+            : "Early structure appears to have broken here, which made later choices more reactive.",
+        },
+        {
+          title: `${this.minutesToClock(firstFailureMinute + 180)} | Compounding phase`,
+          detail: "Planning debt and task switching appear to interact here, which made recovery more expensive than prevention.",
+        },
+        {
+          title: `${this.minutesToClock(endMinutes - 120)} | Fatigue zone`,
+          detail: "Late-day executive control likely weakened here, raising the odds of strain-based mistakes.",
+        },
+      ],
+      tomorrowPlan: [
+        {
+          title: `${planInput.wakeTime || "07:30"} | Wake and protect the first 30 minutes`,
+          detail: "No scrolling until food, water, and a written first move are done.",
+        },
+        {
+          title: `${this.minutesToClock(wakeMinutes + 45)} | First deep block`,
+          detail: `Start with the single task that matters most tomorrow${planInput.priorities ? `: ${this.splitList(planInput.priorities)[0]}` : ""}.`,
+        },
+        {
+          title: `${this.minutesToClock(wakeMinutes + 300)} | Midday reset`,
+          detail: "Break, eat, and choose the next one or two tasks deliberately before the afternoon compounds.",
+        },
+        {
+          title: `${this.minutesToClock(endMinutes - 45)} | Close the loop`,
+          detail: "Write the next day’s first task before stopping so tomorrow does not begin in friction.",
+        },
+      ],
+      trend: this.buildTrend(rootCauses, history, "autopsy"),
     };
   },
 
-  buildTomorrowPlan(planInput, features) {
+  analyzeTomorrow(planInput, history) {
     const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
-    const firstFocus = this.minutesToClock(wakeMinutes + 45);
-    const middayReset = this.minutesToClock(wakeMinutes + 300);
-    const shutdown = this.minutesToClock(this.timeToMinutes(planInput.dayEndTime || "22:30") - 45);
-
-    return [
-      {
-        title: `${planInput.wakeTime || "07:30"} | Wake and protect the first 30 minutes`,
-        detail:
-          "No scrolling until food, water, and a written first move are done. This guards the day’s cleanest attention window.",
-      },
-      {
-        title: `${firstFocus} | First deep block`,
-        detail: `Start with the single task that matters most tomorrow${planInput.priorities ? `: ${this.splitList(planInput.priorities)[0]}` : ""}.`,
-      },
-      {
-        title: `${middayReset} | Midday reset`,
-        detail:
-          "Break, eat, and choose the next one or two tasks deliberately instead of carrying morning chaos into the afternoon.",
-      },
-      {
-        title: `${shutdown} | Close the loop`,
-        detail: features.contextSwitching
-          ? "List unfinished items and assign each one to a future slot so open loops do not leak back into the evening."
-          : "Write the next day’s first task before stopping so tomorrow does not begin from friction.",
-      },
-    ];
-  },
-
-  buildTrend(rootCauses, history, type) {
-    const sameTypeHistory = history.filter((item) => item.type === type);
-
-    if (!sameTypeHistory.length) {
-      return {
-        title: "No trend yet",
-        body:
-          type === "planner"
-            ? "You have one planning run so far. Save more tomorrow plans to compare how consistent your structure becomes."
-            : "One report is enough for diagnosis, but not enough to confirm whether the same failure mode is repeating across days.",
-      };
-    }
-
-    if (type === "planner") {
-      return {
-        title: "Planner history active",
-        body: `You now have ${sameTypeHistory.length + 1} planning runs including this one. Reuse the planner to compare better day structures over time.`,
-      };
-    }
-
-    const currentPrimary = rootCauses[0].title;
-    const repeatCount = sameTypeHistory.filter(
-      (item) => item.rootCauses && item.rootCauses[0] && item.rootCauses[0].title === currentPrimary
-    ).length;
-
-    if (repeatCount >= 2) {
-      return {
-        title: "Repeat pattern detected",
-        body: `The top failure mode has appeared ${repeatCount + 1} times including today. This is behaving like a system pattern, not a one-off miss.`,
-      };
-    }
+    const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
+    const usableMinutes = Math.max(540, endMinutes - wakeMinutes);
+    const deepWorkStart = wakeMinutes + 45;
+    const middayReset = wakeMinutes + 300;
+    const shutdown = Math.max(wakeMinutes + 720, endMinutes - 45);
+    const focusHours = Math.max(2.5, Math.min(7.5, (usableMinutes - 240) / 60));
+    const priorities = this.splitList(planInput.priorities);
+    const scheduleItems = this.splitList(planInput.schedule);
+    const planQuality = Math.min(96, 48 + priorities.length * 9 + scheduleItems.length * 7 + (focusHours - 2) * 4);
 
     return {
-      title: "Pattern still forming",
-      body: "Today shares some friction with earlier reports, but the app does not yet see one dominant repeating cause.",
+      id: createId(),
+      type: "planner",
+      createdAt: new Date().toISOString(),
+      planner: planInput,
+      summary:
+        priorities.length > 0
+          ? `Tomorrow should start earlier in intention than in effort: lock the first hour, start with ${priorities[0]}, and avoid letting fixed commitments scatter your attention.`
+          : "Tomorrow needs stronger structure first: set 2 to 4 priorities, protect the first hour, and use commitments as anchors instead of letting them fragment the day.",
+      planQuality,
+      focusHours,
+      bestStartWindow: this.minutesToClock(deepWorkStart),
+      bestStartWhy:
+        "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
+      shutdownTime: this.minutesToClock(shutdown),
+      suggestedSchedule: [
+        {
+          title: `${planInput.wakeTime || "07:30"} | Wake, fuel, and orient`,
+          detail: "Use the first 30 minutes for water, food, and deciding the first priority. Do not let messages or scrolling occupy this slot.",
+        },
+        {
+          title: `${this.minutesToClock(deepWorkStart)} | Primary deep-work block`,
+          detail: priorities.length
+            ? `Start with ${priorities[0]}. This should be the cleanest cognitive block of the day.`
+            : "Reserve this block for the hardest task before lower-value noise enters the day.",
+        },
+        {
+          title: `${this.minutesToClock(middayReset)} | Midday reset`,
+          detail: "Break, eat, and decide the next work lane deliberately. This prevents the afternoon from becoming reactive.",
+        },
+        {
+          title: `${this.minutesToClock(shutdown)} | Shutdown window`,
+          detail: "Close loops, list carryover tasks, and decide tomorrow’s first move before ending the day.",
+        },
+      ],
+      priorityPlan: priorities.length
+        ? priorities.slice(0, 4).map((priority, index) => ({
+            title: `Priority ${index + 1} | ${priority}`,
+            detail:
+              index === 0
+                ? "Place this inside the first deep-work block."
+                : index === 1
+                  ? "Handle this after the midday reset."
+                  : "Keep this in a later, lower-energy slot or batch it with admin work.",
+          }))
+        : [
+            {
+              title: "No priorities entered",
+              detail: "Add 2 to 4 concrete priorities so the planner can schedule a tighter day.",
+            },
+          ],
+      efficiencyRules: [
+        {
+          title: "Rule 1 | Protect the first hour",
+          detail: "No phone drift before your first planned block starts.",
+        },
+        {
+          title: "Rule 2 | One lane at a time",
+          detail: "Use one clear work lane per block instead of mixing assignments or tasks.",
+        },
+        {
+          title: "Rule 3 | Schedule the reset before you need it",
+          detail: "The midday break should exist in the plan before energy drops.",
+        },
+      ],
+      notes: [
+        {
+          title: `Focus capacity | ${focusHours.toFixed(1)} hours`,
+          detail: "This is the estimated amount of realistic focused work your schedule can hold without turning the whole day into strain.",
+        },
+        {
+          title: `Commitment load | ${scheduleItems.length} fixed item${scheduleItems.length === 1 ? "" : "s"}`,
+          detail:
+            scheduleItems.length > 0
+              ? "Your fixed commitments reduce flexibility, so the first deep-work window becomes more valuable."
+              : "Your day is flexible, which means structure matters even more because nothing external will impose it.",
+        },
+        {
+          title: "Planning logic",
+          detail: "The planner front-loads hard work, inserts a reset before the afternoon, and uses a shutdown window so tomorrow does not begin in friction.",
+        },
+      ],
+      trend: this.buildTrend([], history, "planner"),
     };
   },
 };
 
 const elements = {
+  landingView: document.getElementById("landingView"),
+  resultsPage: document.getElementById("resultsPage"),
+  jumpToInputBtn: document.getElementById("jumpToInputBtn"),
+  heroAnalyzeBtn: document.getElementById("heroAnalyzeBtn"),
+  heroPlannerBtn: document.getElementById("heroPlannerBtn"),
+  backBtn: document.getElementById("backBtn"),
   dayLog: document.getElementById("dayLog"),
   analyzeBtn: document.getElementById("analyzeBtn"),
   clearBtn: document.getElementById("clearBtn"),
   loadSampleBtn: document.getElementById("loadSampleBtn"),
   sampleList: document.getElementById("sampleList"),
-  emptyState: document.getElementById("emptyState"),
-  emptyText: document.getElementById("emptyText"),
-  resultsView: document.getElementById("resultsView"),
+  historyList: document.getElementById("historyList"),
+  historyChart: document.getElementById("historyChart"),
+  historyCountMetric: document.getElementById("historyCountMetric"),
+  avgSeverityMetric: document.getElementById("avgSeverityMetric"),
+  plannerCountMetric: document.getElementById("plannerCountMetric"),
+  trendMetric: document.getElementById("trendMetric"),
+  clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+  workspaceHeading: document.getElementById("workspaceHeading"),
+  autopsyModeBtn: document.getElementById("autopsyModeBtn"),
+  plannerModeBtn: document.getElementById("plannerModeBtn"),
+  autopsyInputSection: document.getElementById("autopsyInputSection"),
+  plannerInputSection: document.getElementById("plannerInputSection"),
+  wakeTime: document.getElementById("wakeTime"),
+  dayEndTime: document.getElementById("dayEndTime"),
+  fixedSchedule: document.getElementById("fixedSchedule"),
+  priorities: document.getElementById("priorities"),
   resultsHeading: document.getElementById("resultsHeading"),
   analysisStamp: document.getElementById("analysisStamp"),
+  autopsyControls: document.getElementById("autopsyControls"),
+  shortReportBtn: document.getElementById("shortReportBtn"),
+  deepReportBtn: document.getElementById("deepReportBtn"),
+  autopsyResultsSection: document.getElementById("autopsyResultsSection"),
+  plannerResultsSection: document.getElementById("plannerResultsSection"),
+  deepSection: document.getElementById("deepSection"),
   autopsySummary: document.getElementById("autopsySummary"),
   severityScore: document.getElementById("severityScore"),
   confidenceScore: document.getElementById("confidenceScore"),
+  failureMoment: document.getElementById("failureMoment"),
+  failureWhy: document.getElementById("failureWhy"),
+  scrollCost: document.getElementById("scrollCost"),
+  planningDebt: document.getElementById("planningDebt"),
+  energyStrain: document.getElementById("energyStrain"),
   timeLeakCount: document.getElementById("timeLeakCount"),
   burnoutCount: document.getElementById("burnoutCount"),
   timeLeaks: document.getElementById("timeLeaks"),
   burnoutSignals: document.getElementById("burnoutSignals"),
   rootCauses: document.getElementById("rootCauses"),
   behaviorPatches: document.getElementById("behaviorPatches"),
-  trendTitle: document.getElementById("trendTitle"),
-  trendBody: document.getElementById("trendBody"),
-  historyList: document.getElementById("historyList"),
-  clearHistoryBtn: document.getElementById("clearHistoryBtn"),
-  shortReportBtn: document.getElementById("shortReportBtn"),
-  deepReportBtn: document.getElementById("deepReportBtn"),
-  deepSection: document.getElementById("deepSection"),
-  failureMoment: document.getElementById("failureMoment"),
-  failureWhy: document.getElementById("failureWhy"),
-  scrollCost: document.getElementById("scrollCost"),
-  planningDebt: document.getElementById("planningDebt"),
-  energyStrain: document.getElementById("energyStrain"),
   failureTimeline: document.getElementById("failureTimeline"),
   tomorrowPlan: document.getElementById("tomorrowPlan"),
-  wakeTime: document.getElementById("wakeTime"),
-  dayEndTime: document.getElementById("dayEndTime"),
-  fixedSchedule: document.getElementById("fixedSchedule"),
-  priorities: document.getElementById("priorities"),
-  autopsyModeBtn: document.getElementById("autopsyModeBtn"),
-  plannerModeBtn: document.getElementById("plannerModeBtn"),
-  featureMenuBtn: document.getElementById("featureMenuBtn"),
-  autopsyInputSection: document.getElementById("autopsyInputSection"),
-  plannerInputSection: document.getElementById("plannerInputSection"),
-  autopsyControls: document.getElementById("autopsyControls"),
-  autopsyResultsSection: document.getElementById("autopsyResultsSection"),
-  plannerResultsSection: document.getElementById("plannerResultsSection"),
   plannerSummary: document.getElementById("plannerSummary"),
   planQualityScore: document.getElementById("planQualityScore"),
   focusHoursScore: document.getElementById("focusHoursScore"),
@@ -583,10 +445,12 @@ const elements = {
   priorityPlan: document.getElementById("priorityPlan"),
   efficiencyRules: document.getElementById("efficiencyRules"),
   plannerNotes: document.getElementById("plannerNotes"),
+  trendTitle: document.getElementById("trendTitle"),
+  trendBody: document.getElementById("trendBody"),
 };
 
-let reportDepth = "short";
 let activeMode = "autopsy";
+let reportDepth = "short";
 
 function loadHistory() {
   try {
@@ -609,6 +473,15 @@ function formatDate(dateString) {
   }).format(new Date(dateString));
 }
 
+function plannerInput() {
+  return {
+    wakeTime: elements.wakeTime.value,
+    dayEndTime: elements.dayEndTime.value,
+    schedule: elements.fixedSchedule.value.trim(),
+    priorities: elements.priorities.value.trim(),
+  };
+}
+
 function renderInsightList(container, items) {
   container.innerHTML = items
     .map(
@@ -622,6 +495,29 @@ function renderInsightList(container, items) {
     .join("");
 }
 
+function setMode(mode) {
+  activeMode = mode;
+  const planner = mode === "planner";
+  elements.autopsyModeBtn.classList.toggle("active", !planner);
+  elements.plannerModeBtn.classList.toggle("active", planner);
+  elements.autopsyInputSection.classList.toggle("hidden", planner);
+  elements.plannerInputSection.classList.toggle("hidden", !planner);
+  elements.workspaceHeading.textContent = planner ? "Plan Tomorrow" : "Choose Your Mode";
+  elements.analyzeBtn.textContent = planner ? "Plan Tomorrow" : "Show Analysis";
+}
+
+function showResultsPage() {
+  elements.landingView.classList.add("hidden");
+  elements.resultsPage.classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showLandingPage() {
+  elements.resultsPage.classList.add("hidden");
+  elements.landingView.classList.remove("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function setReportDepth(depth) {
   reportDepth = depth;
   elements.shortReportBtn.classList.toggle("active", depth === "short");
@@ -629,32 +525,21 @@ function setReportDepth(depth) {
   elements.deepSection.classList.toggle("hidden", depth !== "deep");
 }
 
-function plannerInput() {
-  return {
-    wakeTime: elements.wakeTime.value,
-    dayEndTime: elements.dayEndTime.value,
-    schedule: elements.fixedSchedule.value.trim(),
-    priorities: elements.priorities.value.trim(),
-  };
-}
-
 function renderAutopsy(report) {
   elements.resultsHeading.textContent = "Autopsy Report";
   elements.autopsyControls.classList.remove("hidden");
   elements.autopsyResultsSection.classList.remove("hidden");
   elements.plannerResultsSection.classList.add("hidden");
-
   elements.autopsySummary.textContent = report.summary;
   elements.severityScore.textContent = Math.round(report.severity);
   elements.confidenceScore.textContent = `${Math.round(report.confidence * 100)}%`;
-  elements.timeLeakCount.textContent = String(report.timeLeaks.length);
-  elements.burnoutCount.textContent = String(report.burnoutSignals.length);
   elements.failureMoment.textContent = report.failurePoint.moment;
   elements.failureWhy.textContent = report.failurePoint.why;
   elements.scrollCost.textContent = Math.round(report.metrics.scrollCost);
   elements.planningDebt.textContent = Math.round(report.metrics.planningDebt);
   elements.energyStrain.textContent = Math.round(report.metrics.energyStrain);
-
+  elements.timeLeakCount.textContent = report.timeLeaks.length;
+  elements.burnoutCount.textContent = report.burnoutSignals.length;
   renderInsightList(elements.timeLeaks, report.timeLeaks);
   renderInsightList(elements.burnoutSignals, report.burnoutSignals);
   renderInsightList(elements.rootCauses, report.rootCauses);
@@ -669,7 +554,6 @@ function renderPlanner(report) {
   elements.autopsyControls.classList.add("hidden");
   elements.autopsyResultsSection.classList.add("hidden");
   elements.plannerResultsSection.classList.remove("hidden");
-
   elements.plannerSummary.textContent = report.summary;
   elements.planQualityScore.textContent = Math.round(report.planQuality);
   elements.focusHoursScore.textContent = `${report.focusHours.toFixed(1)}h`;
@@ -678,7 +562,6 @@ function renderPlanner(report) {
   elements.plannerWake.textContent = report.planner.wakeTime || "--";
   elements.plannerDeepWork.textContent = report.bestStartWindow;
   elements.plannerShutdown.textContent = report.shutdownTime;
-
   renderInsightList(elements.schedulePlan, report.suggestedSchedule);
   renderInsightList(elements.priorityPlan, report.priorityPlan);
   renderInsightList(elements.efficiencyRules, report.efficiencyRules);
@@ -686,23 +569,16 @@ function renderPlanner(report) {
 }
 
 function renderReport(report) {
-  elements.emptyState.classList.add("hidden");
-  elements.resultsView.classList.remove("hidden");
   elements.analysisStamp.textContent = `Analyzed ${formatDate(report.createdAt)}`;
   elements.trendTitle.textContent = report.trend.title;
   elements.trendBody.textContent = report.trend.body;
-
   if (report.type === "planner") renderPlanner(report);
   else renderAutopsy(report);
 }
 
 function renderHistory(history) {
   if (!history.length) {
-    elements.historyList.innerHTML = `
-      <div class="empty-history">
-        Run an analysis to start building a personal pattern history.
-      </div>
-    `;
+    elements.historyList.innerHTML = `<div class="empty-history">Run an autopsy or planner analysis to start your visible history.</div>`;
     return;
   }
 
@@ -719,8 +595,8 @@ function renderHistory(history) {
           <h3>${item.summary}</h3>
           <p class="history-excerpt">${
             item.type === "planner"
-              ? `${item.planner.priorities || "No priorities entered"}`
-              : `${item.rawLog.slice(0, 130)}${item.rawLog.length > 130 ? "..." : ""}`
+              ? item.planner.priorities || "No priorities entered"
+              : `${item.rawLog.slice(0, 140)}${item.rawLog.length > 140 ? "..." : ""}`
           }</p>
         </article>
       `
@@ -729,25 +605,95 @@ function renderHistory(history) {
 
   document.querySelectorAll(".history-item").forEach((node) => {
     node.addEventListener("click", () => {
-      const historyItems = loadHistory();
-      const match = historyItems.find((item) => item.id === node.dataset.id);
-      if (!match) return;
-
-      if (match.planner) {
-        elements.wakeTime.value = match.planner.wakeTime || "07:30";
-        elements.dayEndTime.value = match.planner.dayEndTime || "22:30";
-        elements.fixedSchedule.value = match.planner.schedule || "";
-        elements.priorities.value = match.planner.priorities || "";
+      const report = loadHistory().find((item) => item.id === node.dataset.id);
+      if (!report) return;
+      if (report.planner) {
+        elements.wakeTime.value = report.planner.wakeTime || "07:30";
+        elements.dayEndTime.value = report.planner.dayEndTime || "22:30";
+        elements.fixedSchedule.value = report.planner.schedule || "";
+        elements.priorities.value = report.planner.priorities || "";
       }
-      if (match.rawLog) {
-        elements.dayLog.value = match.rawLog;
-      }
-
-      setMode(match.type === "planner" ? "planner" : "autopsy");
-      renderReport(match);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (report.rawLog) elements.dayLog.value = report.rawLog;
+      setMode(report.type);
+      renderReport(report);
+      showResultsPage();
     });
   });
+}
+
+function renderHistoryChart(history) {
+  if (!history.length) {
+    elements.historyChart.innerHTML = `<div class="chart-empty">No chart yet. Run a few analyses to build a 2-week view.</div>`;
+    elements.historyCountMetric.textContent = "0";
+    elements.avgSeverityMetric.textContent = "0";
+    elements.plannerCountMetric.textContent = "0";
+    elements.trendMetric.textContent = "Stable";
+    return;
+  }
+
+  const now = new Date();
+  const days = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date(now);
+    date.setDate(now.getDate() - (13 - index));
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      value: 0,
+    };
+  });
+
+  history.forEach((item) => {
+    const key = item.createdAt.slice(0, 10);
+    const day = days.find((entry) => entry.key === key);
+    if (!day) return;
+    day.value = Math.max(day.value, item.type === "planner" ? item.planQuality : Math.round(item.severity));
+  });
+
+  const maxValue = Math.max(...days.map((day) => day.value), 100);
+  const svgBars = days
+    .map((day, index) => {
+      const height = Math.max(6, (day.value / maxValue) * 150);
+      const x = 20 + index * 36;
+      const y = 190 - height;
+      const fill = day.value > 0 ? "url(#barGradient)" : "rgba(17,17,17,0.08)";
+      return `
+        <rect x="${x}" y="${y}" width="22" height="${height}" rx="11" fill="${fill}"></rect>
+        <text x="${x + 11}" y="214" text-anchor="middle" font-size="10" fill="#77778d">${day.label.slice(0, 3)}</text>
+      `;
+    })
+    .join("");
+
+  elements.historyChart.innerHTML = `
+    <svg viewBox="0 0 560 230" width="100%" height="240" role="img" aria-label="Two week analysis chart">
+      <defs>
+        <linearGradient id="barGradient" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#a468ff"></stop>
+          <stop offset="100%" stop-color="#6b35dd"></stop>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="560" height="230" rx="26" fill="rgba(255,255,255,0.6)"></rect>
+      <line x1="18" y1="190" x2="540" y2="190" stroke="rgba(17,17,17,0.08)" stroke-width="1"></line>
+      ${svgBars}
+    </svg>
+  `;
+
+  const autopsies = history.filter((item) => item.type === "autopsy");
+  const planners = history.filter((item) => item.type === "planner");
+  const avgSeverity =
+    autopsies.length > 0
+      ? Math.round(autopsies.reduce((sum, item) => sum + item.severity, 0) / autopsies.length)
+      : 0;
+  const trendDirection =
+    autopsies.length >= 2 && autopsies[autopsies.length - 1].severity < autopsies[0].severity
+      ? "Improving"
+      : planners.length > 1
+        ? "More Planned"
+        : "Stable";
+
+  elements.historyCountMetric.textContent = String(history.length);
+  elements.avgSeverityMetric.textContent = String(avgSeverity);
+  elements.plannerCountMetric.textContent = String(planners.length);
+  elements.trendMetric.textContent = trendDirection;
 }
 
 function runAnalysis() {
@@ -762,18 +708,20 @@ function runAnalysis() {
     }
     report = analyzer.analyzeTomorrow(input, history);
   } else {
-    const trimmed = elements.dayLog.value.trim();
-    if (!trimmed) {
+    const text = elements.dayLog.value.trim();
+    if (!text) {
       elements.dayLog.focus();
       return;
     }
-    report = analyzer.analyzeDay(trimmed, history, plannerInput());
+    report = analyzer.analyzeDay(text, history, plannerInput());
   }
 
-  const updatedHistory = [...history, report].slice(-12);
+  const updatedHistory = [...history, report].slice(-20);
   saveHistory(updatedHistory);
   renderReport(report);
   renderHistory(updatedHistory);
+  renderHistoryChart(updatedHistory);
+  showResultsPage();
 }
 
 function loadSample(index = 0) {
@@ -784,47 +732,41 @@ function loadSample(index = 0) {
   elements.fixedSchedule.value = sample.schedule;
   elements.priorities.value = sample.priorities;
   setMode("autopsy");
+  document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderSamples() {
   elements.sampleList.innerHTML = sampleLogs
     .map(
-      (sample, index) => `
-        <button class="sample-chip" data-index="${index}">${sample.label}</button>
-      `
+      (sample, index) => `<button class="sample-chip" data-index="${index}">${sample.label}</button>`
     )
     .join("");
 
   document.querySelectorAll(".sample-chip").forEach((button) => {
-    button.addEventListener("click", () => {
-      loadSample(Number(button.dataset.index));
-    });
+    button.addEventListener("click", () => loadSample(Number(button.dataset.index)));
   });
 }
 
-function setMode(mode) {
-  activeMode = mode;
-  const planner = mode === "planner";
-
-  elements.autopsyModeBtn.classList.toggle("active", !planner);
-  elements.plannerModeBtn.classList.toggle("active", planner);
-  elements.autopsyInputSection.classList.toggle("hidden", planner);
-  elements.plannerInputSection.classList.toggle("hidden", !planner);
-
-  elements.emptyText.textContent = planner
-    ? "Enter tomorrow’s wake time, end time, schedule constraints, and priorities to generate a better day plan."
-    : "Start with a rough day log to uncover where the day failed.";
-
-  if (planner) elements.priorities.focus();
-  else elements.dayLog.focus();
-}
-
+elements.jumpToInputBtn.addEventListener("click", () => {
+  document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+elements.heroAnalyzeBtn.addEventListener("click", () => {
+  setMode("autopsy");
+  document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+elements.heroPlannerBtn.addEventListener("click", () => {
+  setMode("planner");
+  document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 document.querySelectorAll(".feature-option").forEach((button) => {
   button.addEventListener("click", () => {
     setMode(button.dataset.mode);
+    document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 });
-
+elements.backBtn.addEventListener("click", showLandingPage);
+elements.autopsyModeBtn.addEventListener("click", () => setMode("autopsy"));
+elements.plannerModeBtn.addEventListener("click", () => setMode("planner"));
 elements.analyzeBtn.addEventListener("click", runAnalysis);
 elements.clearBtn.addEventListener("click", () => {
   elements.dayLog.value = "";
@@ -832,19 +774,15 @@ elements.clearBtn.addEventListener("click", () => {
   elements.priorities.value = "";
   elements.wakeTime.value = "07:30";
   elements.dayEndTime.value = "22:30";
-  if (activeMode === "planner") elements.priorities.focus();
-  else elements.dayLog.focus();
 });
 elements.loadSampleBtn.addEventListener("click", () => loadSample(0));
+elements.shortReportBtn.addEventListener("click", () => setReportDepth("short"));
+elements.deepReportBtn.addEventListener("click", () => setReportDepth("deep"));
 elements.clearHistoryBtn.addEventListener("click", () => {
   localStorage.removeItem(STORAGE_KEY);
   renderHistory([]);
+  renderHistoryChart([]);
 });
-elements.shortReportBtn.addEventListener("click", () => setReportDepth("short"));
-elements.deepReportBtn.addEventListener("click", () => setReportDepth("deep"));
-elements.autopsyModeBtn.addEventListener("click", () => setMode("autopsy"));
-elements.plannerModeBtn.addEventListener("click", () => setMode("planner"));
-elements.featureMenuBtn.addEventListener("click", () => setMode("planner"));
 elements.dayLog.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
     runAnalysis();
@@ -852,6 +790,8 @@ elements.dayLog.addEventListener("keydown", (event) => {
 });
 
 renderSamples();
-renderHistory(loadHistory());
-setReportDepth("short");
+const initialHistory = loadHistory();
+renderHistory(initialHistory);
+renderHistoryChart(initialHistory);
 setMode("autopsy");
+setReportDepth("short");

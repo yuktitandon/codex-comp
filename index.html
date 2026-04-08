@@ -8,371 +8,416 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">AI DAY AUTOPSY</p>
-          <h1>Debug the day that broke down, then plan a better one tomorrow.</h1>
-          <p class="hero-text">
-            Not a generic productivity tracker. Diagnose the break point behind a bad day,
-            or switch modes and generate a more efficient tomorrow around your real schedule.
-          </p>
+      <section id="landingView" class="landing-view">
+        <header class="topbar">
+          <div class="brand-lockup">
+            <span class="brand-dot"></span>
+            <span class="brand-name">AI Day Autopsy</span>
+          </div>
+          <nav class="topbar-nav">
+            <a href="#features">Features</a>
+            <a href="#planner">Plan Tomorrow</a>
+            <a href="#history">History</a>
+          </nav>
+          <button id="jumpToInputBtn" class="topbar-cta">Try It</button>
+        </header>
 
-          <div class="hero-mode-wrap">
-            <button id="featureMenuBtn" class="feature-menu-button">Choose a mode</button>
-            <div class="feature-menu">
-              <button class="feature-option" data-mode="autopsy">
-                <span>Why did the day fail?</span>
-                <small>Inspect time leaks, burnout signals, and the first break point.</small>
-              </button>
-              <button class="feature-option" data-mode="planner">
-                <span>Plan tomorrow better</span>
-                <small>Build a realistic day structure around wake time, commitments, and priorities.</small>
-              </button>
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">DAY DEBUGGER</p>
+            <h1>
+              All your day signals.
+              <span class="accent-line">One clear diagnosis.</span>
+            </h1>
+            <p class="hero-text">
+              Find the real reason the day failed, then build a sharper next day around your actual schedule,
+              priorities, and energy.
+            </p>
+            <div class="hero-actions">
+              <button id="heroAnalyzeBtn" class="primary-button">Show Analysis</button>
+              <button id="heroPlannerBtn" class="secondary-button hero-secondary">Plan Tomorrow</button>
+            </div>
+            <div class="hero-points">
+              <span>Precise failure points</span>
+              <span>Next-day schedule planning</span>
+              <span>History and trend tracking</span>
             </div>
           </div>
 
-          <div class="hero-steps">
-            <div class="hero-step">
-              <strong>1</strong>
-              <span>Tell us about your rough day</span>
-            </div>
-            <div class="hero-step">
-              <strong>2</strong>
-              <span>Run analysis</span>
-            </div>
-            <div class="hero-step">
-              <strong>3</strong>
-              <span>Explore where it went wrong</span>
-            </div>
-            <div class="hero-step">
-              <strong>4</strong>
-              <span>See how to plan tomorrow</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="hero-visual">
-          <div class="phone-frame">
-            <div class="phone-notch"></div>
-            <div class="phone-screen">
-              <div class="phone-panel">
-                <p class="phone-label">Planner Preview</p>
-                <h3>07:15 AM</h3>
-                <p class="phone-copy">Wake, eat, then enter your first protected work block before messages touch the day.</p>
-              </div>
-              <div class="phone-stat-row">
-                <div class="phone-stat">
-                  <span>Focus Block</span>
-                  <strong>08:00</strong>
+          <div class="phone-stage">
+            <div class="iphone-frame">
+              <div class="iphone-camera-bar"></div>
+              <div class="iphone-side-button side-button-top"></div>
+              <div class="iphone-side-button side-button-mid"></div>
+              <div class="iphone-side-button side-button-low"></div>
+              <div class="iphone-power-button"></div>
+              <div class="iphone-screen">
+                <div class="screen-header">
+                  <span>9:41</span>
+                  <span>Analysis</span>
+                  <span>100%</span>
                 </div>
-                <div class="phone-stat">
-                  <span>Shutdown</span>
-                  <strong>21:45</strong>
+                <div class="screen-card screen-card-hero">
+                  <p>Likely Failure Point</p>
+                  <h3>8:10 AM</h3>
+                  <strong>Phone drift replaced planning.</strong>
+                </div>
+                <div class="screen-stat-row">
+                  <div class="screen-stat">
+                    <span>Severity</span>
+                    <strong>82</strong>
+                  </div>
+                  <div class="screen-stat">
+                    <span>Tomorrow</span>
+                    <strong>7:15</strong>
+                  </div>
+                </div>
+                <div class="screen-card">
+                  <p class="screen-section-label">Root Cause</p>
+                  <strong>Unprotected start-of-day ramp</strong>
+                  <small>The first hour was easy to hijack, so the day inherited weak pacing.</small>
+                </div>
+                <div class="screen-card">
+                  <p class="screen-section-label">Patch</p>
+                  <strong>Lock the first 30 minutes</strong>
+                  <small>Water, food, and one written first task before touching the phone.</small>
                 </div>
               </div>
-              <div class="phone-list">
-                <div class="phone-item">
-                  <strong>Today</strong>
-                  <p>Autopsy the failure point with quantified drag and strain.</p>
-                </div>
-                <div class="phone-item">
-                  <strong>Tomorrow</strong>
-                  <p>Turn schedule constraints into a cleaner day design.</p>
-                </div>
-              </div>
             </div>
-          </div>
-        </div>
-      </header>
-
-      <main class="main-grid">
-        <section class="panel input-panel">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Input</p>
-              <h2>Choose Your Mode</h2>
-            </div>
-            <button id="loadSampleBtn" class="ghost-button">Load Demo Sample</button>
-          </div>
-
-          <div class="intent-switch">
-            <button id="autopsyModeBtn" class="intent-button active">Day Autopsy</button>
-            <button id="plannerModeBtn" class="intent-button">Plan Tomorrow</button>
-          </div>
-
-          <section id="autopsyInputSection">
-            <label class="input-label" for="dayLog">
-              Paste a schedule, journal entry, or messy day recap
-            </label>
-            <textarea
-              id="dayLog"
-              class="log-input"
-              placeholder="I woke up late, checked my phone for an hour, skipped breakfast, bounced between assignments, reopened tabs constantly, and felt fried by 4 PM."
-            ></textarea>
-
-            <div class="sample-bank">
-              <p class="sample-title">Sample Logs</p>
-              <div id="sampleList" class="sample-list"></div>
-            </div>
-          </section>
-
-          <section id="plannerInputSection" class="planner-box hidden">
-            <div class="planner-box-header">
-              <div>
-                <p class="section-kicker">Tomorrow Setup</p>
-                <h3>Plan the next day properly</h3>
-              </div>
-              <p class="planner-subtext">
-                Tell the app when your day starts and ends, what is fixed, and what matters most.
-              </p>
-            </div>
-
-            <div class="planner-grid">
-              <label>
-                <span>Wake up time</span>
-                <input id="wakeTime" type="time" value="07:30" />
-              </label>
-              <label>
-                <span>Day end time</span>
-                <input id="dayEndTime" type="time" value="22:30" />
-              </label>
-              <label class="planner-wide">
-                <span>Fixed commitments</span>
-                <textarea
-                  id="fixedSchedule"
-                  placeholder="Class 10-12, gym at 6 PM, meeting at 3 PM..."
-                ></textarea>
-              </label>
-              <label class="planner-wide">
-                <span>Main priorities for tomorrow</span>
-                <textarea
-                  id="priorities"
-                  placeholder="Finish lab report, revise for quiz, reply to internship email..."
-                ></textarea>
-              </label>
-            </div>
-          </section>
-
-          <div class="action-row">
-            <button id="analyzeBtn" class="primary-button">Analyze</button>
-            <button id="clearBtn" class="secondary-button">Clear</button>
           </div>
         </section>
 
-        <section class="panel output-panel">
-          <div class="panel-header">
-            <div>
-              <p class="section-kicker">Results</p>
-              <h2 id="resultsHeading">Autopsy Report</h2>
-            </div>
-            <div id="analysisStamp" class="analysis-stamp">Awaiting input</div>
-          </div>
-
-          <div id="autopsyControls" class="report-controls">
-            <button id="shortReportBtn" class="report-button active">Short Report</button>
-            <button id="deepReportBtn" class="report-button">Deep Analysis</button>
-          </div>
-
-          <div id="emptyState" class="empty-state">
-            <p class="empty-title">Nothing analyzed yet</p>
-            <p id="emptyText">
-              Start with a rough day log to uncover where the day failed, or switch to planning mode to structure tomorrow.
+        <section id="features" class="steps-section">
+          <div class="steps-header">
+            <p class="eyebrow">HOW IT WORKS</p>
+            <h2>Simple to use. Sharp enough to feel real.</h2>
+            <p>
+              The product is designed to feel calm and obvious: one path for understanding the bad day,
+              another for planning the next one more intelligently.
             </p>
           </div>
-
-          <div id="resultsView" class="results-view hidden">
-            <section id="autopsyResultsSection">
-              <section class="autopsy-hero">
-                <div>
-                  <p class="section-kicker">Primary Insight</p>
-                  <h3 id="autopsySummary">Summary appears here</h3>
-                </div>
-                <div class="score-grid">
-                  <div class="score-card">
-                    <span>Severity</span>
-                    <strong id="severityScore">0</strong>
-                  </div>
-                  <div class="score-card">
-                    <span>Confidence</span>
-                    <strong id="confidenceScore">0%</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section class="breakpoint-strip">
-                <article class="break-card primary-break">
-                  <p class="section-kicker">Likely First Failure Point</p>
-                  <h4 id="failureMoment">No break point yet</h4>
-                  <p id="failureWhy" class="break-copy"></p>
-                </article>
-                <article class="break-card">
-                  <span>Scroll Drag</span>
-                  <strong id="scrollCost">0</strong>
-                  <small>estimated focus points lost</small>
-                </article>
-                <article class="break-card">
-                  <span>Planning Debt</span>
-                  <strong id="planningDebt">0</strong>
-                  <small>friction points from weak structure</small>
-                </article>
-                <article class="break-card">
-                  <span>Energy Strain</span>
-                  <strong id="energyStrain">0</strong>
-                  <small>burnout pressure score</small>
-                </article>
-              </section>
-
-              <section class="card-grid">
-                <article class="insight-card accent-red">
-                  <div class="card-title-row">
-                    <h4>Time Leaks</h4>
-                    <span id="timeLeakCount" class="count-pill">0</span>
-                  </div>
-                  <div id="timeLeaks" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-amber">
-                  <div class="card-title-row">
-                    <h4>Burnout Signals</h4>
-                    <span id="burnoutCount" class="count-pill">0</span>
-                  </div>
-                  <div id="burnoutSignals" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-blue">
-                  <div class="card-title-row">
-                    <h4>Root Causes</h4>
-                    <span class="count-pill">3</span>
-                  </div>
-                  <div id="rootCauses" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-green">
-                  <div class="card-title-row">
-                    <h4>Behavioral Patches</h4>
-                    <span class="count-pill">3</span>
-                  </div>
-                  <div id="behaviorPatches" class="insight-list"></div>
-                </article>
-              </section>
-
-              <section id="deepSection" class="deep-section hidden">
-                <article class="insight-card accent-ink">
-                  <div class="card-title-row">
-                    <h4>Failure Timeline</h4>
-                    <span class="count-pill">Quantified</span>
-                  </div>
-                  <div id="failureTimeline" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-sand">
-                  <div class="card-title-row">
-                    <h4>Tomorrow Plan</h4>
-                    <span class="count-pill">Next Day</span>
-                  </div>
-                  <div id="tomorrowPlan" class="insight-list"></div>
-                </article>
-              </section>
-            </section>
-
-            <section id="plannerResultsSection" class="hidden">
-              <section class="autopsy-hero planner-hero">
-                <div>
-                  <p class="section-kicker">Tomorrow Summary</p>
-                  <h3 id="plannerSummary">Planner summary appears here</h3>
-                </div>
-                <div class="score-grid">
-                  <div class="score-card">
-                    <span>Plan Quality</span>
-                    <strong id="planQualityScore">0</strong>
-                  </div>
-                  <div class="score-card">
-                    <span>Focus Hours</span>
-                    <strong id="focusHoursScore">0h</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section class="breakpoint-strip planner-strip">
-                <article class="break-card primary-break">
-                  <p class="section-kicker">Best Start Window</p>
-                  <h4 id="bestStartWindow">No plan yet</h4>
-                  <p id="bestStartWhy" class="break-copy"></p>
-                </article>
-                <article class="break-card">
-                  <span>Wake</span>
-                  <strong id="plannerWake">--</strong>
-                  <small>recommended start</small>
-                </article>
-                <article class="break-card">
-                  <span>Deep Work</span>
-                  <strong id="plannerDeepWork">--</strong>
-                  <small>best uninterrupted block</small>
-                </article>
-                <article class="break-card">
-                  <span>Shutdown</span>
-                  <strong id="plannerShutdown">--</strong>
-                  <small>end the day cleanly</small>
-                </article>
-              </section>
-
-              <section class="card-grid">
-                <article class="insight-card accent-blue">
-                  <div class="card-title-row">
-                    <h4>Suggested Schedule</h4>
-                    <span class="count-pill">Tomorrow</span>
-                  </div>
-                  <div id="schedulePlan" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-green">
-                  <div class="card-title-row">
-                    <h4>Priority Handling</h4>
-                    <span class="count-pill">Focus</span>
-                  </div>
-                  <div id="priorityPlan" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-amber">
-                  <div class="card-title-row">
-                    <h4>Efficiency Rules</h4>
-                    <span class="count-pill">Protect</span>
-                  </div>
-                  <div id="efficiencyRules" class="insight-list"></div>
-                </article>
-
-                <article class="insight-card accent-sand">
-                  <div class="card-title-row">
-                    <h4>Planner Notes</h4>
-                    <span class="count-pill">Reasoning</span>
-                  </div>
-                  <div id="plannerNotes" class="insight-list"></div>
-                </article>
-              </section>
-            </section>
-
-            <section class="trend-panel">
-              <div>
-                <p class="section-kicker">History Trend</p>
-                <h4 id="trendTitle">Run a few analyses to unlock trend tracking</h4>
-              </div>
-              <p id="trendBody" class="trend-body">
-                Saved reports will reveal whether the same breakdown pattern is repeating.
-              </p>
-            </section>
+          <div class="steps-grid">
+            <article class="step-card">
+              <span class="step-number">01</span>
+              <h3>Tell the app about your day</h3>
+              <p>Paste a messy log, a rough schedule, or a journal-style recap. No formatting required.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">02</span>
+              <h3>See where it actually went wrong</h3>
+              <p>The app highlights the likely break point, time leaks, burnout pressure, and quantified drag.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">03</span>
+              <h3>Choose short or deep analysis</h3>
+              <p>Get a quick, readable report or expand into a more detailed timeline and patch logic.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-number">04</span>
+              <h3>Plan tomorrow around real constraints</h3>
+              <p>Set wake time, end time, commitments, and priorities, then turn that into a cleaner day shape.</p>
+            </article>
           </div>
         </section>
-      </main>
 
-      <section class="history-section">
-        <div class="history-header">
-          <div>
-            <p class="section-kicker">Saved Analyses</p>
-            <h2>History</h2>
+        <section id="planner" class="workspace-section">
+          <div class="workspace-card">
+            <div class="workspace-header">
+              <div>
+                <p class="eyebrow">WORKSPACE</p>
+                <h2 id="workspaceHeading">Choose Your Mode</h2>
+              </div>
+              <button id="loadSampleBtn" class="ghost-button">Load Demo Sample</button>
+            </div>
+
+            <div class="intent-switch">
+              <button id="autopsyModeBtn" class="intent-button active">Day Autopsy</button>
+              <button id="plannerModeBtn" class="intent-button">Plan Tomorrow</button>
+            </div>
+
+            <section id="autopsyInputSection" class="input-mode">
+              <label class="input-label" for="dayLog">Paste your rough day log</label>
+              <textarea
+                id="dayLog"
+                class="log-input"
+                placeholder="I woke up late, checked my phone for an hour, skipped breakfast, bounced between assignments, reopened tabs constantly, and felt fried by 4 PM."
+              ></textarea>
+              <div class="sample-bank">
+                <p class="sample-title">Sample Logs</p>
+                <div id="sampleList" class="sample-list"></div>
+              </div>
+            </section>
+
+            <section id="plannerInputSection" class="input-mode planner-form hidden">
+              <div class="planner-grid">
+                <label>
+                  <span>Wake up time</span>
+                  <input id="wakeTime" type="time" value="07:30" />
+                </label>
+                <label>
+                  <span>Day end time</span>
+                  <input id="dayEndTime" type="time" value="22:30" />
+                </label>
+                <label class="planner-wide">
+                  <span>Fixed commitments</span>
+                  <textarea
+                    id="fixedSchedule"
+                    placeholder="Class 10-12, gym at 6 PM, meeting at 3 PM..."
+                  ></textarea>
+                </label>
+                <label class="planner-wide">
+                  <span>Main priorities</span>
+                  <textarea
+                    id="priorities"
+                    placeholder="Finish lab report, revise for quiz, reply to internship email..."
+                  ></textarea>
+                </label>
+              </div>
+            </section>
+
+            <div class="workspace-actions">
+              <button id="analyzeBtn" class="primary-button">Show Analysis</button>
+              <button id="clearBtn" class="secondary-button">Clear</button>
+            </div>
           </div>
-          <button id="clearHistoryBtn" class="ghost-button">Clear History</button>
+        </section>
+
+        <section id="history" class="history-dashboard">
+          <div class="history-dashboard-header">
+            <div>
+              <p class="eyebrow">LAST 2 WEEKS</p>
+              <h2>History that looks believable.</h2>
+            </div>
+            <button id="clearHistoryBtn" class="ghost-button">Clear History</button>
+          </div>
+          <div class="history-dashboard-grid">
+            <article class="history-chart-card">
+              <div class="card-title-row">
+                <h3>Analysis Chart</h3>
+                <span class="count-pill">14 days</span>
+              </div>
+              <div id="historyChart" class="history-chart"></div>
+            </article>
+            <article class="history-progress-card">
+              <div class="card-title-row">
+                <h3>Progress Signals</h3>
+                <span class="count-pill">Credibility</span>
+              </div>
+              <div class="progress-metrics">
+                <div class="progress-metric">
+                  <span>Analyses Logged</span>
+                  <strong id="historyCountMetric">0</strong>
+                </div>
+                <div class="progress-metric">
+                  <span>Average Severity</span>
+                  <strong id="avgSeverityMetric">0</strong>
+                </div>
+                <div class="progress-metric">
+                  <span>Planner Runs</span>
+                  <strong id="plannerCountMetric">0</strong>
+                </div>
+                <div class="progress-metric">
+                  <span>Recent Trend</span>
+                  <strong id="trendMetric">Stable</strong>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </section>
+
+      <section id="resultsPage" class="results-page hidden">
+        <header class="results-topbar">
+          <button id="backBtn" class="ghost-button">Go Back</button>
+          <div class="results-topbar-meta">
+            <p class="eyebrow">RESULTS</p>
+            <h2 id="resultsHeading">Autopsy Report</h2>
+          </div>
+          <div id="analysisStamp" class="analysis-stamp">Awaiting input</div>
+        </header>
+
+        <div id="autopsyControls" class="report-controls">
+          <button id="shortReportBtn" class="report-button active">Short Report</button>
+          <button id="deepReportBtn" class="report-button">Deep Analysis</button>
         </div>
-        <div id="historyList" class="history-list"></div>
+
+        <section id="autopsyResultsSection" class="results-section">
+          <section class="results-hero-card">
+            <div>
+              <p class="eyebrow">PRIMARY INSIGHT</p>
+              <h3 id="autopsySummary">Summary appears here</h3>
+            </div>
+            <div class="score-grid">
+              <div class="score-card">
+                <span>Severity</span>
+                <strong id="severityScore">0</strong>
+              </div>
+              <div class="score-card">
+                <span>Confidence</span>
+                <strong id="confidenceScore">0%</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="breakpoint-strip">
+            <article class="break-card primary-break">
+              <p class="eyebrow">LIKELY FIRST FAILURE POINT</p>
+              <h4 id="failureMoment">No break point yet</h4>
+              <p id="failureWhy" class="break-copy"></p>
+            </article>
+            <article class="break-card">
+              <span>Scroll Drag</span>
+              <strong id="scrollCost">0</strong>
+              <small>estimated focus points lost</small>
+            </article>
+            <article class="break-card">
+              <span>Planning Debt</span>
+              <strong id="planningDebt">0</strong>
+              <small>friction points from weak structure</small>
+            </article>
+            <article class="break-card">
+              <span>Energy Strain</span>
+              <strong id="energyStrain">0</strong>
+              <small>burnout pressure score</small>
+            </article>
+          </section>
+
+          <section class="results-grid">
+            <article class="insight-card accent-red">
+              <div class="card-title-row">
+                <h4>Time Leaks</h4>
+                <span id="timeLeakCount" class="count-pill">0</span>
+              </div>
+              <div id="timeLeaks" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-amber">
+              <div class="card-title-row">
+                <h4>Burnout Signals</h4>
+                <span id="burnoutCount" class="count-pill">0</span>
+              </div>
+              <div id="burnoutSignals" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-blue">
+              <div class="card-title-row">
+                <h4>Root Causes</h4>
+                <span class="count-pill">3</span>
+              </div>
+              <div id="rootCauses" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-green">
+              <div class="card-title-row">
+                <h4>Behavioral Patches</h4>
+                <span class="count-pill">3</span>
+              </div>
+              <div id="behaviorPatches" class="insight-list"></div>
+            </article>
+          </section>
+
+          <section id="deepSection" class="results-grid hidden">
+            <article class="insight-card accent-ink">
+              <div class="card-title-row">
+                <h4>Failure Timeline</h4>
+                <span class="count-pill">Quantified</span>
+              </div>
+              <div id="failureTimeline" class="insight-list"></div>
+            </article>
+            <article class="insight-card accent-sand">
+              <div class="card-title-row">
+                <h4>Tomorrow Plan</h4>
+                <span class="count-pill">Next Day</span>
+              </div>
+              <div id="tomorrowPlan" class="insight-list"></div>
+            </article>
+          </section>
+        </section>
+
+        <section id="plannerResultsSection" class="results-section hidden">
+          <section class="results-hero-card">
+            <div>
+              <p class="eyebrow">TOMORROW SUMMARY</p>
+              <h3 id="plannerSummary">Planner summary appears here</h3>
+            </div>
+            <div class="score-grid">
+              <div class="score-card">
+                <span>Plan Quality</span>
+                <strong id="planQualityScore">0</strong>
+              </div>
+              <div class="score-card">
+                <span>Focus Hours</span>
+                <strong id="focusHoursScore">0h</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="breakpoint-strip">
+            <article class="break-card primary-break">
+              <p class="eyebrow">BEST START WINDOW</p>
+              <h4 id="bestStartWindow">No plan yet</h4>
+              <p id="bestStartWhy" class="break-copy"></p>
+            </article>
+            <article class="break-card">
+              <span>Wake</span>
+              <strong id="plannerWake">--</strong>
+              <small>recommended start</small>
+            </article>
+            <article class="break-card">
+              <span>Deep Work</span>
+              <strong id="plannerDeepWork">--</strong>
+              <small>best uninterrupted block</small>
+            </article>
+            <article class="break-card">
+              <span>Shutdown</span>
+              <strong id="plannerShutdown">--</strong>
+              <small>end the day cleanly</small>
+            </article>
+          </section>
+
+          <section class="results-grid">
+            <article class="insight-card accent-blue">
+              <div class="card-title-row">
+                <h4>Suggested Schedule</h4>
+                <span class="count-pill">Tomorrow</span>
+              </div>
+              <div id="schedulePlan" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-green">
+              <div class="card-title-row">
+                <h4>Priority Handling</h4>
+                <span class="count-pill">Focus</span>
+              </div>
+              <div id="priorityPlan" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-amber">
+              <div class="card-title-row">
+                <h4>Efficiency Rules</h4>
+                <span class="count-pill">Protect</span>
+              </div>
+              <div id="efficiencyRules" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-sand">
+              <div class="card-title-row">
+                <h4>Planner Notes</h4>
+                <span class="count-pill">Reasoning</span>
+              </div>
+              <div id="plannerNotes" class="insight-list"></div>
+            </article>
+          </section>
+        </section>
+
+        <section class="trend-panel">
+          <div>
+            <p class="eyebrow">TREND</p>
+            <h4 id="trendTitle">No trend yet</h4>
+          </div>
+          <p id="trendBody" class="trend-body"></p>
+        </section>
       </section>
     </div>
 
