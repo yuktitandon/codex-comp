@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Day Autopsy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">AI DAY AUTOPSY</p>
+          <h1>Find the hidden failure point behind a bad day.</h1>
+          <p class="hero-text">
+            A life debugger for overloaded students and early-career professionals.
+            Paste a messy day log and get the real causes, not generic advice.
+          </p>
+          <div class="hero-meta">
+            <span>Structured day analysis</span>
+            <span>Burnout risk signals</span>
+            <span>Specific next-day patches</span>
+          </div>
+        </div>
+        <div class="hero-side">
+          <div class="hero-card">
+            <span class="hero-card-label">Demo Flow</span>
+            <ol>
+              <li>Paste a rough day log</li>
+              <li>Run analysis</li>
+              <li>Expose the failure point</li>
+              <li>Show what changes tomorrow</li>
+            </ol>
+          </div>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section class="panel input-panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Input</p>
+              <h2>Day Log</h2>
+            </div>
+            <button id="loadSampleBtn" class="ghost-button">Load Demo Sample</button>
+          </div>
+
+          <label class="input-label" for="dayLog">
+            Paste a schedule, journal entry, or messy day recap
+          </label>
+          <textarea
+            id="dayLog"
+            class="log-input"
+            placeholder="I woke up late, checked my phone for an hour, skipped breakfast, bounced between assignments, reopened tabs constantly, and felt fried by 4 PM."
+          ></textarea>
+
+          <div class="action-row">
+            <button id="analyzeBtn" class="primary-button">Analyze Day</button>
+            <button id="clearBtn" class="secondary-button">Clear</button>
+          </div>
+
+          <div class="sample-bank">
+            <p class="sample-title">Sample Logs</p>
+            <div id="sampleList" class="sample-list"></div>
+          </div>
+        </section>
+
+        <section class="panel output-panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Results</p>
+              <h2>Autopsy Report</h2>
+            </div>
+            <div id="analysisStamp" class="analysis-stamp">Awaiting input</div>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <p class="empty-title">No autopsy yet</p>
+            <p>
+              Drop in a rough day log and the app will identify time leaks, burnout signals,
+              root causes, and specific behavioral patches.
+            </p>
+          </div>
+
+          <div id="resultsView" class="results-view hidden">
+            <section class="autopsy-hero">
+              <div>
+                <p class="section-kicker">Primary Insight</p>
+                <h3 id="autopsySummary">Summary appears here</h3>
+              </div>
+              <div class="score-grid">
+                <div class="score-card">
+                  <span>Severity</span>
+                  <strong id="severityScore">0</strong>
+                </div>
+                <div class="score-card">
+                  <span>Confidence</span>
+                  <strong id="confidenceScore">0%</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="card-grid">
+              <article class="insight-card accent-red">
+                <div class="card-title-row">
+                  <h4>Time Leaks</h4>
+                  <span id="timeLeakCount" class="count-pill">0</span>
+                </div>
+                <div id="timeLeaks" class="insight-list"></div>
+              </article>
+
+              <article class="insight-card accent-amber">
+                <div class="card-title-row">
+                  <h4>Burnout Signals</h4>
+                  <span id="burnoutCount" class="count-pill">0</span>
+                </div>
+                <div id="burnoutSignals" class="insight-list"></div>
+              </article>
+
+              <article class="insight-card accent-blue">
+                <div class="card-title-row">
+                  <h4>Root Causes</h4>
+                  <span class="count-pill">3</span>
+                </div>
+                <div id="rootCauses" class="insight-list"></div>
+              </article>
+
+              <article class="insight-card accent-green">
+                <div class="card-title-row">
+                  <h4>Behavioral Patches</h4>
+                  <span class="count-pill">3</span>
+                </div>
+                <div id="behaviorPatches" class="insight-list"></div>
+              </article>
+            </section>
+
+            <section class="trend-panel">
+              <div>
+                <p class="section-kicker">History Trend</p>
+                <h4 id="trendTitle">Run a few analyses to unlock trend tracking</h4>
+              </div>
+              <p id="trendBody" class="trend-body">
+                Saved reports will reveal whether the same breakdown pattern is repeating.
+              </p>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <section class="history-section">
+        <div class="history-header">
+          <div>
+            <p class="section-kicker">Saved Analyses</p>
+            <h2>History</h2>
+          </div>
+          <button id="clearHistoryBtn" class="ghost-button">Clear History</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
