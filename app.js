@@ -1,4 +1,4 @@
-const STORAGE_KEY = "ai-day-autopsy-history";
+const STORAGE_KEY = "day-debug-history";
 const createId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -36,14 +36,15 @@ const sampleLogs = [
 
 const analyzer = {
   keywordSets: {
-    lateStart: ["woke up late", "slept in", "overslept", "late start"],
-    phoneDrift: ["phone", "instagram", "tiktok", "scroll", "social media", "youtube"],
-    nutritionDebt: ["skipped breakfast", "skipped lunch", "didn't eat", "forgot to eat", "no lunch"],
-    contextSwitching: ["bounced between", "reopened", "tabs", "slack", "multitask", "switched", "three tasks"],
-    stress: ["fried", "wired", "overwhelmed", "burned out", "heavy", "useless", "crashed", "drained"],
-    urgency: ["rushed", "behind", "forgot", "missed", "due", "late"],
-    fatigue: ["tired", "exhausted", "no break", "too much coffee", "staring", "mistakes"],
-    planningDebt: ["forgot", "missed", "behind", "bounced between", "rushed", "started three tasks"],
+    lateStart: ["woke up late", "slept in", "overslept", "late start", "woke up at", "got up late"],
+    phoneDrift: ["phone", "instagram", "tiktok", "scroll", "social media", "youtube", "reels", "doomscroll", "checked my phone"],
+    nutritionDebt: ["skipped breakfast", "skipped lunch", "didn't eat", "forgot to eat", "no lunch", "missed breakfast", "missed lunch"],
+    contextSwitching: ["bounced between", "reopened", "tabs", "slack", "multitask", "switched", "three tasks", "kept changing", "jumped between"],
+    stress: ["fried", "wired", "overwhelmed", "burned out", "heavy", "useless", "crashed", "drained", "anxious", "stressed", "panicked"],
+    urgency: ["rushed", "behind", "forgot", "missed", "due", "late", "deadline", "catch up"],
+    fatigue: ["tired", "exhausted", "no break", "too much coffee", "staring", "mistakes", "brain fog", "sleepy"],
+    planningDebt: ["forgot", "missed", "behind", "bounced between", "rushed", "started three tasks", "no plan", "unplanned", "figuring out what to do"],
+    avoidance: ["avoided", "procrastinated", "put off", "delayed starting", "couldn't start"],
   },
 
   splitList(value = "") {
@@ -70,19 +71,85 @@ const analyzer = {
   detectFeatures(text) {
     const flags = {};
     for (const [key, phrases] of Object.entries(this.keywordSets)) {
-      flags[key] = phrases.some((phrase) => text.includes(phrase));
+      flags[key] = phrases.filter((phrase) => text.includes(phrase)).length;
     }
 
     return {
       ...flags,
       longLog: text.split(/\s+/).length > 45,
       intenseDay:
-        (flags.phoneDrift ? 1 : 0) +
-          (flags.contextSwitching ? 1 : 0) +
-          (flags.stress ? 1 : 0) +
-          (flags.urgency ? 1 : 0) >=
+        (flags.phoneDrift > 0 ? 1 : 0) +
+          (flags.contextSwitching > 0 ? 1 : 0) +
+          (flags.stress > 0 ? 1 : 0) +
+          (flags.urgency > 0 ? 1 : 0) >=
         3,
     };
+  },
+
+  parseTimeToken(raw, meridiemHint = null) {
+    if (!raw) return null;
+    const match = raw.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    const minute = Number(match[2] || 0);
+    const suffix = (match[3] || meridiemHint || "").toLowerCase();
+    if (suffix === "pm" && hour !== 12) hour += 12;
+    if (suffix === "am" && hour === 12) hour = 0;
+    if (!suffix && hour < 7) hour += 12;
+    return hour * 60 + minute;
+  },
+
+  parseCommitments(scheduleText, wakeMinutes, endMinutes) {
+    const items = this.splitList(scheduleText).map((label) => {
+      const range =
+        label.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:-|to)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i) ||
+        label.match(/from\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:-|to)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+
+      if (range) {
+        const hint = /pm/i.test(range[1]) || /pm/i.test(range[2]) ? "pm" : /am/i.test(range[1]) || /am/i.test(range[2]) ? "am" : null;
+        const start = this.parseTimeToken(range[1], hint);
+        const end = this.parseTimeToken(range[2], hint);
+        if (start !== null && end !== null && end > start) {
+          return { label, start, end };
+        }
+      }
+
+      const single = label.match(/(?:at\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+      if (single) {
+        const start = this.parseTimeToken(single[1]);
+        if (start !== null) {
+          return { label, start, end: Math.min(start + 60, endMinutes) };
+        }
+      }
+
+      return null;
+    }).filter(Boolean);
+
+    const filtered = items
+      .map((item) => ({
+        ...item,
+        start: Math.max(wakeMinutes + 30, item.start),
+        end: Math.min(endMinutes - 30, item.end),
+      }))
+      .filter((item) => item.end > item.start)
+      .sort((a, b) => a.start - b.start);
+
+    return filtered;
+  },
+
+  buildOpenWindows(commitments, wakeMinutes, endMinutes) {
+    const windows = [];
+    let cursor = wakeMinutes + 30;
+    for (const item of commitments) {
+      if (item.start - cursor >= 40) {
+        windows.push({ start: cursor, end: item.start });
+      }
+      cursor = Math.max(cursor, item.end);
+    }
+    if (endMinutes - cursor >= 40) {
+      windows.push({ start: cursor, end: endMinutes - 30 });
+    }
+    return windows;
   },
 
   buildTrend(rootCauses, history, type) {
@@ -127,41 +194,41 @@ const analyzer = {
     const features = this.detectFeatures(normalized);
     const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
     const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
-    const scrollCost = (features.phoneDrift ? 28 : 8) + (features.lateStart ? 10 : 0);
+    const scrollCost = (features.phoneDrift > 0 ? 18 + features.phoneDrift * 8 : 8) + (features.lateStart > 0 ? 10 : 0);
     const planningDebt =
-      (features.planningDebt ? 26 : 10) +
+      (features.planningDebt > 0 ? 16 + features.planningDebt * 5 : 10) +
       (!planInput.schedule ? 14 : 0) +
       (!planInput.priorities ? 12 : 0);
     const energyStrain =
-      (features.nutritionDebt ? 24 : 8) +
-      (features.stress ? 20 : 6) +
-      (features.fatigue ? 18 : 4);
+      (features.nutritionDebt > 0 ? 20 + features.nutritionDebt * 4 : 8) +
+      (features.stress > 0 ? 16 + features.stress * 3 : 6) +
+      (features.fatigue > 0 ? 14 + features.fatigue * 2 : 4);
     const severity = Math.min(97, 28 + scrollCost * 0.7 + planningDebt * 0.55 + energyStrain * 0.62);
     const confidence = Math.min(
       0.95,
       0.63 +
         (features.longLog ? 0.08 : 0) +
-        (features.phoneDrift ? 0.07 : 0) +
-        (features.contextSwitching ? 0.08 : 0) +
-        (features.stress ? 0.06 : 0) +
+        (features.phoneDrift > 0 ? 0.07 : 0) +
+        (features.contextSwitching > 0 ? 0.08 : 0) +
+        (features.stress > 0 ? 0.06 : 0) +
         (normalized.includes("felt") ? 0.04 : 0)
     );
-    const firstFailureMinute = features.phoneDrift
+    const firstFailureMinute = features.phoneDrift > 0
       ? wakeMinutes + 40
-      : features.lateStart
+      : features.lateStart > 0
         ? wakeMinutes + 20
-        : features.contextSwitching
+        : features.contextSwitching > 0 || features.avoidance > 0
           ? wakeMinutes + 150
           : wakeMinutes + 90;
 
     const rootCauses = [
       {
-        title: features.phoneDrift || features.lateStart ? "Unprotected start-of-day ramp" : "Weak early structure",
+        title: features.phoneDrift > 0 || features.lateStart > 0 ? "Unprotected start-of-day ramp" : "Weak early structure",
         detail:
           "The first hour was too easy to hijack, so the rest of the day inherited weaker focus and pacing.",
       },
       {
-        title: features.contextSwitching || features.urgency ? "No stable execution lane" : "Over-flexible task switching",
+        title: features.contextSwitching > 0 || features.urgency > 0 ? "No stable execution lane" : "Over-flexible task switching",
         detail: "Without a visible lane, each interruption or open tab became a new candidate for attention.",
       },
       {
@@ -179,17 +246,25 @@ const analyzer = {
       severity,
       confidence,
       summary:
-        features.phoneDrift && features.contextSwitching
+        features.phoneDrift > 0 && features.contextSwitching > 0
           ? `The day likely failed at the transition from intention to execution: the first hour drifted, then the rest of the day fractured. Severity ${Math.round(severity)}/100.`
+          : features.lateStart > 0 && features.planningDebt > 0
+            ? `The day appears to have started behind and stayed reactive: a compressed start plus weak planning kept forcing catch-up decisions. Severity ${Math.round(severity)}/100.`
+            : features.avoidance > 0
+              ? `The day seems to have broken at the moment hard work was delayed, which let stress build faster than progress. Severity ${Math.round(severity)}/100.`
           : `The main pattern was unstable focus under rising strain, which turned normal work into a cascade of friction by mid to late day. Severity ${Math.round(severity)}/100.`,
       failurePoint: {
-        moment: features.phoneDrift
+        moment: features.phoneDrift > 0
           ? `${this.minutesToClock(firstFailureMinute)}: screen drift displaced day setup`
-          : features.lateStart
+          : features.lateStart > 0
             ? `${this.minutesToClock(firstFailureMinute)}: late wake-up compressed the day`
+            : features.avoidance > 0
+              ? `${this.minutesToClock(firstFailureMinute)}: task avoidance created drag early`
             : `${this.minutesToClock(firstFailureMinute)}: planning debt started to show`,
-        why: features.phoneDrift
+        why: features.phoneDrift > 0
           ? "The first high-leverage decision window was lost to passive scrolling, which made the rest of the day reactive instead of directed."
+          : features.avoidance > 0
+            ? "The day likely got heavier when the hardest task was delayed, which let smaller tasks and stress take over the schedule."
           : "The day appears to have drifted once tasks stopped being pre-decided and attention had to keep renegotiating priorities.",
       },
       metrics: { scrollCost, planningDebt, energyStrain },
@@ -203,19 +278,19 @@ const analyzer = {
           detail: "A weak or missing day shape forced the next task to be re-decided too often.",
         },
         {
-          title: features.contextSwitching ? "Task-fragmented work blocks" : "Diffuse attention leakage",
-          detail: features.contextSwitching
+          title: features.contextSwitching > 0 ? "Task-fragmented work blocks" : "Diffuse attention leakage",
+          detail: features.contextSwitching > 0
             ? "Repeated reopening and switching created restart costs that made the workload feel larger."
             : "The day spread effort too thinly, which quietly drained attention.",
         },
       ],
       burnoutSignals: [
         {
-          title: features.nutritionDebt ? "Energy support broke early" : "Energy support looks unstable",
+          title: features.nutritionDebt > 0 ? "Energy support broke early" : "Energy support looks unstable",
           detail: "Skipping meals or delaying recovery tends to make late-day focus problems feel like a character issue instead of a fuel issue.",
         },
         {
-          title: features.stress ? "Language of overload" : "Stress is compounding friction",
+          title: features.stress > 0 ? "Language of overload" : "Stress is compounding friction",
           detail: "Words like fried, useless, or overwhelmed usually signal strain accumulation rather than a single bad task.",
         },
         {
@@ -247,7 +322,7 @@ const analyzer = {
         },
         {
           title: `${this.minutesToClock(firstFailureMinute)} | Likely first break point`,
-          detail: features.phoneDrift
+          detail: features.phoneDrift > 0
             ? `Phone drift likely consumed the first planning block and cost about ${scrollCost} focus points.`
             : "Early structure appears to have broken here, which made later choices more reactive.",
         },
@@ -286,13 +361,37 @@ const analyzer = {
     const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
     const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
     const usableMinutes = Math.max(540, endMinutes - wakeMinutes);
-    const deepWorkStart = wakeMinutes + 45;
-    const middayReset = wakeMinutes + 300;
+    const commitments = this.parseCommitments(planInput.schedule, wakeMinutes, endMinutes);
+    const openWindows = this.buildOpenWindows(commitments, wakeMinutes, endMinutes);
+    const bestWindow = openWindows.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0] || {
+      start: wakeMinutes + 45,
+      end: wakeMinutes + 135,
+    };
+    const deepWorkStart = bestWindow.start;
+    const middayReset = Math.min(endMinutes - 180, wakeMinutes + 300);
     const shutdown = Math.max(wakeMinutes + 720, endMinutes - 45);
     const focusHours = Math.max(2.5, Math.min(7.5, (usableMinutes - 240) / 60));
     const priorities = this.splitList(planInput.priorities);
-    const scheduleItems = this.splitList(planInput.schedule);
-    const planQuality = Math.min(96, 48 + priorities.length * 9 + scheduleItems.length * 7 + (focusHours - 2) * 4);
+    const scheduleItems = commitments.length ? commitments.map((item) => item.label) : this.splitList(planInput.schedule);
+    const planQuality = Math.min(
+      96,
+      44 + priorities.length * 9 + scheduleItems.length * 7 + (focusHours - 2) * 4 + (openWindows.length > 1 ? 6 : 0)
+    );
+
+    const allocatedPriorityPlan = priorities.length
+      ? priorities.slice(0, 4).map((priority, index) => {
+          const window = openWindows[Math.min(index, Math.max(0, openWindows.length - 1))] || bestWindow;
+          return {
+            title: `Priority ${index + 1} | ${priority}`,
+            detail:
+              index === 0
+                ? `Place this in ${this.minutesToClock(window.start)} to ${this.minutesToClock(Math.min(window.start + 90, window.end))}, your strongest open block.`
+                : index === 1
+                  ? `Move this into ${this.minutesToClock(window.start)} to ${this.minutesToClock(Math.min(window.start + 75, window.end))} after the main block or after a reset.`
+                  : `Batch this into a later lighter window such as ${this.minutesToClock(window.start)} onward so it does not contaminate the first deep block.`,
+          };
+        })
+      : null;
 
     return {
       id: createId(),
@@ -307,7 +406,9 @@ const analyzer = {
       focusHours,
       bestStartWindow: this.minutesToClock(deepWorkStart),
       bestStartWhy:
-        "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
+        commitments.length
+          ? "This is the largest open window after accounting for your fixed commitments, so it is the best place to protect serious work."
+          : "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
       shutdownTime: this.minutesToClock(shutdown),
       suggestedSchedule: [
         {
@@ -320,6 +421,10 @@ const analyzer = {
             ? `Start with ${priorities[0]}. This should be the cleanest cognitive block of the day.`
             : "Reserve this block for the hardest task before lower-value noise enters the day.",
         },
+        ...commitments.slice(0, 3).map((item) => ({
+          title: `${this.minutesToClock(item.start)}-${this.minutesToClock(item.end)} | Fixed commitment`,
+          detail: item.label,
+        })),
         {
           title: `${this.minutesToClock(middayReset)} | Midday reset`,
           detail: "Break, eat, and decide the next work lane deliberately. This prevents the afternoon from becoming reactive.",
@@ -330,15 +435,7 @@ const analyzer = {
         },
       ],
       priorityPlan: priorities.length
-        ? priorities.slice(0, 4).map((priority, index) => ({
-            title: `Priority ${index + 1} | ${priority}`,
-            detail:
-              index === 0
-                ? "Place this inside the first deep-work block."
-                : index === 1
-                  ? "Handle this after the midday reset."
-                  : "Keep this in a later, lower-energy slot or batch it with admin work.",
-          }))
+        ? allocatedPriorityPlan
         : [
             {
               title: "No priorities entered",
@@ -368,7 +465,7 @@ const analyzer = {
           title: `Commitment load | ${scheduleItems.length} fixed item${scheduleItems.length === 1 ? "" : "s"}`,
           detail:
             scheduleItems.length > 0
-              ? "Your fixed commitments reduce flexibility, so the first deep-work window becomes more valuable."
+              ? "Your fixed commitments reduce flexibility, so the planner is actively routing priorities into the clean windows around them."
               : "Your day is flexible, which means structure matters even more because nothing external will impose it.",
         },
         {
