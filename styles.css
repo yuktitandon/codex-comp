@@ -234,6 +234,7 @@ a {
 .phone-stage {
   display: flex;
   justify-content: center;
+  perspective: 1800px;
 }
 
 .iphone-frame {
@@ -246,6 +247,43 @@ a {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     0 38px 100px rgba(19, 19, 25, 0.32);
+  transform: rotateY(-16deg) rotateX(7deg);
+  transform-style: preserve-3d;
+}
+
+.iphone-bezel-glow,
+.iphone-edge-reflection,
+.iphone-bottom-shadow {
+  position: absolute;
+  pointer-events: none;
+}
+
+.iphone-bezel-glow {
+  inset: 0;
+  border-radius: 56px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.22), transparent 24%),
+    radial-gradient(circle at 84% 88%, rgba(143, 77, 255, 0.18), transparent 30%);
+  mix-blend-mode: screen;
+}
+
+.iphone-edge-reflection {
+  inset: 6px auto 6px 6px;
+  width: 26px;
+  border-radius: 56px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.18) 85%);
+  filter: blur(0.5px);
+  opacity: 0.6;
+}
+
+.iphone-bottom-shadow {
+  left: 8%;
+  right: 8%;
+  bottom: -22px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(16, 16, 24, 0.38), transparent 72%);
+  transform: translateZ(-30px) rotateX(88deg);
 }
 
 .iphone-top-shadow {
@@ -318,6 +356,7 @@ a {
     linear-gradient(180deg, #fbfaff 0%, #f1eeff 54%, #f8f8fc 100%);
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  transform: translateZ(24px);
 }
 
 .screen-header {
