@@ -221,6 +221,18 @@ const analyzer = {
           ? wakeMinutes + 150
           : wakeMinutes + 90;
 
+    const dominantSignals = [
+      features.phoneDrift > 0 ? "early phone drift" : null,
+      features.lateStart > 0 ? "a compressed late start" : null,
+      features.contextSwitching > 0 ? "constant task switching" : null,
+      features.planningDebt > 0 ? "weak day structure" : null,
+      features.nutritionDebt > 0 ? "low energy support" : null,
+      features.avoidance > 0 ? "avoidance of the hardest task" : null,
+      features.stress > 0 ? "rising overload signals" : null,
+    ].filter(Boolean);
+
+    const dominantSummary = dominantSignals.slice(0, 2).join(" plus ");
+
     const rootCauses = [
       {
         title: features.phoneDrift > 0 || features.lateStart > 0 ? "Unprotected start-of-day ramp" : "Weak early structure",
@@ -247,12 +259,12 @@ const analyzer = {
       confidence,
       summary:
         features.phoneDrift > 0 && features.contextSwitching > 0
-          ? `The day likely failed at the transition from intention to execution: the first hour drifted, then the rest of the day fractured. Severity ${Math.round(severity)}/100.`
+          ? `The day likely failed at the transition from intention to execution: ${dominantSummary || "the first hour drifted"}, then the rest of the day fractured. Severity ${Math.round(severity)}/100.`
           : features.lateStart > 0 && features.planningDebt > 0
-            ? `The day appears to have started behind and stayed reactive: a compressed start plus weak planning kept forcing catch-up decisions. Severity ${Math.round(severity)}/100.`
+            ? `The day appears to have started behind and stayed reactive: ${dominantSummary || "a compressed start plus weak planning"} kept forcing catch-up decisions. Severity ${Math.round(severity)}/100.`
             : features.avoidance > 0
-              ? `The day seems to have broken at the moment hard work was delayed, which let stress build faster than progress. Severity ${Math.round(severity)}/100.`
-          : `The main pattern was unstable focus under rising strain, which turned normal work into a cascade of friction by mid to late day. Severity ${Math.round(severity)}/100.`,
+              ? `The day seems to have broken when hard work was delayed: ${dominantSummary || "avoidance let low-value tasks fill the schedule"} and stress grew faster than progress. Severity ${Math.round(severity)}/100.`
+          : `The main pattern was ${dominantSummary || "unstable focus under rising strain"}, which turned normal work into a cascade of friction by mid to late day. Severity ${Math.round(severity)}/100.`,
       failurePoint: {
         moment: features.phoneDrift > 0
           ? `${this.minutesToClock(firstFailureMinute)}: screen drift displaced day setup`
@@ -393,6 +405,42 @@ const analyzer = {
         })
       : null;
 
+    const orderedSchedule = [
+      {
+        title: `${planInput.wakeTime || "07:30"} | Wake, fuel, and orient`,
+        detail: "Use the first 30 minutes for water, food, and deciding the first priority. Do not let messages or scrolling occupy this slot.",
+        start: wakeMinutes,
+      },
+      {
+        title: `${this.minutesToClock(deepWorkStart)} | Primary deep-work block`,
+        detail: priorities.length
+          ? `Start with ${priorities[0]}. This should be the cleanest cognitive block of the day.`
+          : "Reserve this block for the hardest task before lower-value noise enters the day.",
+        start: deepWorkStart,
+      },
+      ...commitments.slice(0, 3).map((item) => ({
+        title: `${this.minutesToClock(item.start)}-${this.minutesToClock(item.end)} | Fixed commitment`,
+        detail: item.label,
+        start: item.start,
+      })),
+      {
+        title: `${this.minutesToClock(middayReset)} | Midday reset`,
+        detail: "Break, eat, and decide the next work lane deliberately. This prevents the afternoon from becoming reactive.",
+        start: middayReset,
+      },
+      {
+        title: `${this.minutesToClock(shutdown)} | Shutdown window`,
+        detail: "Close loops, list carryover tasks, and decide tomorrow’s first move before ending the day.",
+        start: shutdown,
+      },
+    ].sort((a, b) => a.start - b.start).map(({ title, detail }) => ({ title, detail }));
+
+    const plannerSummaryBits = [
+      priorities[0] ? `start with ${priorities[0]}` : null,
+      commitments.length ? `route work around ${commitments.length} fixed commitment${commitments.length === 1 ? "" : "s"}` : "protect your first clean work window",
+      priorities.length > 2 ? `avoid overloading ${priorities.length} priorities into the same energy band` : null,
+    ].filter(Boolean);
+
     return {
       id: createId(),
       type: "planner",
@@ -400,8 +448,10 @@ const analyzer = {
       planner: planInput,
       summary:
         priorities.length > 0
-          ? `Tomorrow should start earlier in intention than in effort: lock the first hour, start with ${priorities[0]}, and avoid letting fixed commitments scatter your attention.`
-          : "Tomorrow needs stronger structure first: set 2 to 4 priorities, protect the first hour, and use commitments as anchors instead of letting them fragment the day.",
+          ? `Tomorrow should be structured around what matters most: ${plannerSummaryBits.join(", ")}.`
+          : commitments.length
+            ? "Tomorrow already has structure from fixed commitments, so the goal is to add 2 to 4 priorities and place them into the open windows between them."
+            : "Tomorrow needs stronger structure first: set 2 to 4 priorities, protect the first hour, and use clean time blocks instead of improvising the day.",
       planQuality,
       focusHours,
       bestStartWindow: this.minutesToClock(deepWorkStart),
@@ -410,30 +460,7 @@ const analyzer = {
           ? "This is the largest open window after accounting for your fixed commitments, so it is the best place to protect serious work."
           : "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
       shutdownTime: this.minutesToClock(shutdown),
-      suggestedSchedule: [
-        {
-          title: `${planInput.wakeTime || "07:30"} | Wake, fuel, and orient`,
-          detail: "Use the first 30 minutes for water, food, and deciding the first priority. Do not let messages or scrolling occupy this slot.",
-        },
-        {
-          title: `${this.minutesToClock(deepWorkStart)} | Primary deep-work block`,
-          detail: priorities.length
-            ? `Start with ${priorities[0]}. This should be the cleanest cognitive block of the day.`
-            : "Reserve this block for the hardest task before lower-value noise enters the day.",
-        },
-        ...commitments.slice(0, 3).map((item) => ({
-          title: `${this.minutesToClock(item.start)}-${this.minutesToClock(item.end)} | Fixed commitment`,
-          detail: item.label,
-        })),
-        {
-          title: `${this.minutesToClock(middayReset)} | Midday reset`,
-          detail: "Break, eat, and decide the next work lane deliberately. This prevents the afternoon from becoming reactive.",
-        },
-        {
-          title: `${this.minutesToClock(shutdown)} | Shutdown window`,
-          detail: "Close loops, list carryover tasks, and decide tomorrow’s first move before ending the day.",
-        },
-      ],
+      suggestedSchedule: orderedSchedule,
       priorityPlan: priorities.length
         ? allocatedPriorityPlan
         : [
