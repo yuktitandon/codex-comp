@@ -180,22 +180,35 @@
                     placeholder="Finish lab report, revise for quiz, reply to internship email..."
                   ></textarea>
                 </label>
-                <label>
-                  <span>High-energy hours start</span>
-                  <input id="highEnergyStart" type="time" value="08:00" />
-                </label>
-                <label>
-                  <span>High-energy hours end</span>
-                  <input id="highEnergyEnd" type="time" value="12:00" />
-                </label>
-                <label>
-                  <span>Low-energy hours start</span>
-                  <input id="lowEnergyStart" type="time" value="15:00" />
-                </label>
-                <label>
-                  <span>Low-energy hours end</span>
-                  <input id="lowEnergyEnd" type="time" value="17:30" />
-                </label>
+                <div class="planner-wide energy-toggle-box">
+                  <div class="card-title-row">
+                    <h3>Energy Hours</h3>
+                    <button id="toggleEnergyBtn" type="button" class="ghost-button">
+                      Add High-Energy Hours
+                    </button>
+                  </div>
+                  <p class="planner-helper">
+                    Optional. If you know when your mind is sharpest, we’ll schedule around it.
+                  </p>
+                  <div id="energyHoursSection" class="energy-hours-grid hidden">
+                    <label>
+                      <span>High-energy hours start</span>
+                      <input id="highEnergyStart" type="time" value="08:00" />
+                    </label>
+                    <label>
+                      <span>High-energy hours end</span>
+                      <input id="highEnergyEnd" type="time" value="12:00" />
+                    </label>
+                    <label>
+                      <span>Low-energy hours start</span>
+                      <input id="lowEnergyStart" type="time" value="15:00" />
+                    </label>
+                    <label>
+                      <span>Low-energy hours end</span>
+                      <input id="lowEnergyEnd" type="time" value="17:30" />
+                    </label>
+                  </div>
+                </div>
                 <div class="planner-wide task-builder">
                   <div class="card-title-row">
                     <h3>Tasks For Tomorrow</h3>
@@ -296,11 +309,6 @@
               <p class="eyebrow">LIKELY FIRST FAILURE POINT</p>
               <h4 id="failureMoment">No break point yet</h4>
               <p id="failureWhy" class="break-copy"></p>
-            </article>
-            <article class="break-card">
-              <span>Scroll Drag</span>
-              <strong id="scrollCost">0</strong>
-              <small>estimated focus points lost</small>
             </article>
             <article class="break-card">
               <span>Planning Debt</span>
@@ -456,6 +464,14 @@
                 <span class="count-pill">Editable</span>
               </div>
               <div id="priorityPlan" class="insight-list schedule-adjustments"></div>
+            </article>
+
+            <article class="insight-card accent-red">
+              <div class="card-title-row">
+                <h4>Schedule Conflicts</h4>
+                <span class="count-pill">Check</span>
+              </div>
+              <div id="scheduleConflicts" class="insight-list"></div>
             </article>
 
             <article class="insight-card accent-amber">

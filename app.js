@@ -18,9 +18,9 @@ const sampleLogs = [
     schedule: "Class 10 AM to 12 PM, library from 2 PM, gym at 6 PM",
     priorities: "Finish quiz review, submit lab draft, read chapter notes",
     tasks: [
-      { title: "Finish quiz review", duration: 90, energy: "high" },
-      { title: "Submit lab draft", duration: 75, energy: "high" },
-      { title: "Read chapter notes", duration: 45, energy: "low" },
+      { title: "Finish quiz review", duration: 90 },
+      { title: "Submit lab draft", duration: 75 },
+      { title: "Read chapter notes", duration: 45 },
     ],
   },
   {
@@ -36,9 +36,9 @@ const sampleLogs = [
     schedule: "Work block before 9, team sync at 11, client edits due by 5",
     priorities: "Complete client revision, send invoice, draft presentation outline",
     tasks: [
-      { title: "Complete client revision", duration: 120, energy: "high" },
-      { title: "Send invoice", duration: 25, energy: "low" },
-      { title: "Draft presentation outline", duration: 60, energy: "medium" },
+      { title: "Complete client revision", duration: 120 },
+      { title: "Send invoice", duration: 25 },
+      { title: "Draft presentation outline", duration: 60 },
     ],
   },
   {
@@ -54,9 +54,9 @@ const sampleLogs = [
     schedule: "Morning meetings, project block 1 to 4, dinner at 7",
     priorities: "Finish proposal deck, review hiring notes, clear inbox backlog",
     tasks: [
-      { title: "Finish proposal deck", duration: 100, energy: "high" },
-      { title: "Review hiring notes", duration: 40, energy: "medium" },
-      { title: "Clear inbox backlog", duration: 30, energy: "low" },
+      { title: "Finish proposal deck", duration: 100 },
+      { title: "Review hiring notes", duration: 40 },
+      { title: "Clear inbox backlog", duration: 30 },
     ],
   },
 ];
@@ -139,7 +139,7 @@ const analyzer = {
   },
 
   parseCommitments(scheduleText, wakeMinutes, endMinutes) {
-    const items = this.splitList(scheduleText).map((label) => {
+    return this.splitList(scheduleText).map((label) => {
       const range =
         label.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:-|to)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i) ||
         label.match(/from\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:-|to)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
@@ -149,7 +149,7 @@ const analyzer = {
         const start = this.parseTimeToken(range[1], hint);
         const end = this.parseTimeToken(range[2], hint);
         if (start !== null && end !== null && end > start) {
-          return { label, start, end };
+          return { label, start, end, originalStart: start, originalEnd: end };
         }
       }
 
@@ -157,23 +157,58 @@ const analyzer = {
       if (single) {
         const start = this.parseTimeToken(single[1]);
         if (start !== null) {
-          return { label, start, end: Math.min(start + 60, endMinutes) };
+          return { label, start, end: Math.min(start + 60, endMinutes), originalStart: start, originalEnd: Math.min(start + 60, endMinutes) };
         }
       }
 
       return null;
-    }).filter(Boolean);
+    }).filter(Boolean).sort((a, b) => a.start - b.start);
+  },
 
-    const filtered = items
-      .map((item) => ({
-        ...item,
-        start: Math.max(wakeMinutes + 30, item.start),
-        end: Math.min(endMinutes - 30, item.end),
-      }))
-      .filter((item) => item.end > item.start)
-      .sort((a, b) => a.start - b.start);
+  validateCommitments(commitments, wakeMinutes, endMinutes) {
+    const conflicts = [];
+    const usableCommitments = [];
 
-    return filtered;
+    commitments.forEach((item) => {
+      let invalid = false;
+      if (item.originalStart < wakeMinutes) {
+        conflicts.push({
+          title: `${item.label} starts before your wake time`,
+          detail: `You set wake-up for ${this.minutesToClock(wakeMinutes)}, but this starts at ${this.minutesToClock(item.originalStart)}. Do you want to wake earlier or rearrange this commitment?`,
+        });
+        invalid = true;
+      }
+      if (item.originalEnd > endMinutes) {
+        conflicts.push({
+          title: `${item.label} runs past your day end`,
+          detail: `You set day end for ${this.minutesToClock(endMinutes)}, but this commitment reaches ${this.minutesToClock(item.originalEnd)}. Rearranging this will make the plan more accurate.`,
+        });
+        invalid = true;
+      }
+      if (!invalid) {
+        usableCommitments.push(item);
+      }
+    });
+
+    usableCommitments.sort((a, b) => a.start - b.start);
+
+    for (let index = 0; index < usableCommitments.length - 1; index += 1) {
+      const current = usableCommitments[index];
+      const next = usableCommitments[index + 1];
+      if (current.end > next.start) {
+        conflicts.push({
+          title: `${current.label} overlaps with ${next.label}`,
+          detail: `${this.minutesToClock(current.start)}-${this.minutesToClock(current.end)} clashes with ${this.minutesToClock(next.start)}-${this.minutesToClock(next.end)}. Do you want to rearrange one of these commitments?`,
+        });
+      }
+    }
+
+    const nonOverlapping = usableCommitments.filter((item, index) => {
+      const previous = usableCommitments[index - 1];
+      return !previous || previous.end <= item.start;
+    });
+
+    return { usableCommitments: nonOverlapping, conflicts };
   },
 
   buildOpenWindows(commitments, wakeMinutes, endMinutes) {
@@ -515,60 +550,82 @@ const analyzer = {
   analyzeTomorrow(planInput, history) {
     const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
     const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
-    const usableMinutes = Math.max(540, endMinutes - wakeMinutes);
-    const commitments = this.parseCommitments(planInput.schedule, wakeMinutes, endMinutes);
-    const openWindows = this.buildOpenWindows(commitments, wakeMinutes, endMinutes);
-    const bestWindow = openWindows.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0] || {
+    const normalizedEndMinutes = endMinutes <= wakeMinutes ? wakeMinutes + 60 : endMinutes;
+    const usableMinutes = Math.max(540, normalizedEndMinutes - wakeMinutes);
+    const parsedCommitments = this.parseCommitments(planInput.schedule, wakeMinutes, normalizedEndMinutes);
+    const { usableCommitments: commitments, conflicts } = this.validateCommitments(parsedCommitments, wakeMinutes, normalizedEndMinutes);
+    if (endMinutes <= wakeMinutes) {
+      conflicts.unshift({
+        title: "Day end is earlier than wake-up",
+        detail: `You set wake-up for ${this.minutesToClock(wakeMinutes)} and day end for ${this.minutesToClock(endMinutes)}. Please correct that timing before trusting the schedule.`,
+      });
+    }
+    const openWindows = this.buildOpenWindows(commitments, wakeMinutes, normalizedEndMinutes);
+    const bestWindow = [...openWindows].sort((a, b) => (b.end - b.start) - (a.end - a.start))[0] || {
       start: wakeMinutes + 45,
       end: wakeMinutes + 135,
     };
     const deepWorkStart = bestWindow.start;
-    const middayReset = Math.min(endMinutes - 180, wakeMinutes + 300);
-    const shutdown = Math.max(wakeMinutes + 720, endMinutes - 45);
+    const middayReset = Math.min(normalizedEndMinutes - 180, wakeMinutes + 300);
+    const shutdown = Math.max(wakeMinutes + 720, normalizedEndMinutes - 45);
     const focusHours = Math.max(2.5, Math.min(7.5, (usableMinutes - 240) / 60));
     const priorities = this.splitList(planInput.priorities);
     const scheduleItems = commitments.length ? commitments.map((item) => item.label) : this.splitList(planInput.schedule);
     const tasks = planInput.tasks.filter((task) => task.title && task.duration > 0);
+    const totalTaskMinutes = tasks.reduce((sum, task) => sum + task.duration, 0);
+    const totalOpenMinutes = openWindows.reduce((sum, window) => sum + (window.end - window.start), 0);
+    if ((tasks.length || priorities.length) && totalOpenMinutes < 30) {
+      conflicts.push({
+        title: "Almost no workable open time remains",
+        detail: "Your commitments leave almost no usable planning space. Rearranging one block or reducing the task load will make the schedule more realistic.",
+      });
+    }
+    if (tasks.length && totalOpenMinutes > 0 && totalTaskMinutes > totalOpenMinutes) {
+      conflicts.push({
+        title: "Task load exceeds your open time",
+        detail: `You entered ${totalTaskMinutes} minutes of task work, but only about ${totalOpenMinutes} open minutes fit around your commitments. Do you want to rearrange, shorten, or move some tasks?`,
+      });
+    }
     const planQuality = Math.min(
       96,
-      40 + priorities.length * 7 + scheduleItems.length * 6 + tasks.length * 5 + (focusHours - 2) * 4 + (openWindows.length > 1 ? 6 : 0)
+      Math.max(24, 40 + priorities.length * 7 + scheduleItems.length * 6 + tasks.length * 5 + (focusHours - 2) * 4 + (openWindows.length > 1 ? 6 : 0) - conflicts.length * 12)
     );
-    const highEnergyWindow = {
-      start: this.timeToMinutes(planInput.highEnergyStart || "08:00"),
-      end: this.timeToMinutes(planInput.highEnergyEnd || "12:00"),
-    };
-    const lowEnergyWindow = {
-      start: this.timeToMinutes(planInput.lowEnergyStart || "15:00"),
-      end: this.timeToMinutes(planInput.lowEnergyEnd || "17:30"),
-    };
-    const availableWindows = openWindows.length ? openWindows : [{ start: wakeMinutes + 30, end: endMinutes - 30 }];
+    const highEnergyWindow = planInput.useEnergyHours
+      ? {
+          start: this.timeToMinutes(planInput.highEnergyStart || "08:00"),
+          end: this.timeToMinutes(planInput.highEnergyEnd || "12:00"),
+        }
+      : null;
+    const lowEnergyWindow = planInput.useEnergyHours
+      ? {
+          start: this.timeToMinutes(planInput.lowEnergyStart || "15:00"),
+          end: this.timeToMinutes(planInput.lowEnergyEnd || "17:30"),
+        }
+      : null;
+    const availableWindows = openWindows.length ? openWindows : [{ start: wakeMinutes + 30, end: normalizedEndMinutes - 30 }];
 
     const scheduledTasks = tasks
       .slice()
-      .sort((a, b) => {
-        const rank = { high: 0, medium: 1, low: 2 };
-        return (rank[a.energy] ?? 1) - (rank[b.energy] ?? 1);
-      })
       .map((task, index) => {
         const preferredStart =
-          task.energy === "high"
+          index === 0 && highEnergyWindow
             ? highEnergyWindow.start
-            : task.energy === "low"
+            : index >= Math.max(1, tasks.length - 1) && lowEnergyWindow
               ? lowEnergyWindow.start
               : availableWindows[Math.min(index, availableWindows.length - 1)].start;
         const slot = this.clampToWindow(preferredStart, task.duration, availableWindows);
         return {
           id: `${task.title}-${index}-${slot.start}`,
           title: task.title,
-          energy: task.energy,
           start: slot.start,
           end: slot.end,
         };
       })
       .sort((a, b) => a.start - b.start);
 
-    const allocatedPriorityPlan = (tasks.length ? tasks : priorities.map((title) => ({ title, duration: 60, energy: "medium" }))).length
-      ? (tasks.length ? tasks : priorities.map((title) => ({ title, duration: 60, energy: "medium" }))).slice(0, 4).map((task, index) => {
+    const planningPool = tasks.length ? tasks : priorities.map((title) => ({ title, duration: 60 }));
+    const allocatedPriorityPlan = planningPool.length
+      ? planningPool.slice(0, 4).map((task, index) => {
           const window = scheduledTasks[index]
             ? { start: scheduledTasks[index].start, end: scheduledTasks[index].end }
             : openWindows[Math.min(index, Math.max(0, openWindows.length - 1))] || bestWindow;
@@ -599,7 +656,7 @@ const analyzer = {
       },
       ...scheduledTasks.map((task) => ({
         title: `${this.minutesToClock(task.start)}-${this.minutesToClock(task.end)} | ${task.title}`,
-        detail: `${task.energy} energy task`,
+        detail: "Placed into the cleanest available slot based on your timing, priorities, and open windows.",
         start: task.start,
       })),
       ...commitments.slice(0, 3).map((item) => ({
@@ -623,6 +680,7 @@ const analyzer = {
       priorities[0] ? `start with ${priorities[0]}` : null,
       commitments.length ? `route work around ${commitments.length} fixed commitment${commitments.length === 1 ? "" : "s"}` : "protect your first clean work window",
       priorities.length > 2 ? `avoid overloading ${priorities.length} priorities into the same energy band` : null,
+      conflicts.length ? `resolve ${conflicts.length} schedule conflict${conflicts.length === 1 ? "" : "s"} before trusting this plan` : null,
     ].filter(Boolean);
 
     return {
@@ -631,7 +689,9 @@ const analyzer = {
       createdAt: new Date().toISOString(),
       planner: planInput,
       summary:
-        priorities.length > 0
+        conflicts.length
+          ? `Your schedule has conflicting inputs, so the first job is to correct those before optimizing tomorrow: ${plannerSummaryBits.join(", ")}.`
+          : priorities.length > 0
           ? `Tomorrow should be structured around what matters most: ${plannerSummaryBits.join(", ")}.`
           : commitments.length
             ? "Tomorrow already has structure from fixed commitments, so the goal is to add 2 to 4 priorities and place them into the open windows between them."
@@ -640,12 +700,22 @@ const analyzer = {
       focusHours,
       bestStartWindow: this.minutesToClock(deepWorkStart),
       bestStartWhy:
-        commitments.length
+        conflicts.length
+          ? "This is the cleanest remaining slot, but the overall plan still needs conflict resolution before it becomes reliable."
+          : commitments.length
           ? "This is the largest open window after accounting for your fixed commitments, so it is the best place to protect serious work."
           : "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
       shutdownTime: this.minutesToClock(shutdown),
       suggestedSchedule: orderedSchedule,
       editableSchedule: scheduledTasks,
+      scheduleConflicts: conflicts.length
+        ? conflicts
+        : [
+            {
+              title: "No timing clashes detected",
+              detail: "Your wake time, commitments, and task durations fit together without obvious collisions.",
+            },
+          ],
       priorityPlan: priorities.length
         ? allocatedPriorityPlan
         : [
@@ -682,7 +752,9 @@ const analyzer = {
         },
         {
           title: "Planning logic",
-          detail: "The planner front-loads hard work, considers high and low energy windows, routes around fixed commitments, and uses a shutdown window so tomorrow does not begin in friction.",
+          detail: planInput.useEnergyHours
+            ? "The planner uses the energy hours you gave it, routes around fixed commitments, keeps the schedule in time order, and flags input mistakes before building the day."
+            : "The planner keeps the schedule in time order, routes around fixed commitments, and builds the day from realistic open windows even if you skip energy-hour inputs.",
         },
       ],
       trend: this.buildTrend([], history, "planner"),
@@ -718,6 +790,8 @@ const elements = {
   dayEndTime: document.getElementById("dayEndTime"),
   fixedSchedule: document.getElementById("fixedSchedule"),
   priorities: document.getElementById("priorities"),
+  toggleEnergyBtn: document.getElementById("toggleEnergyBtn"),
+  energyHoursSection: document.getElementById("energyHoursSection"),
   highEnergyStart: document.getElementById("highEnergyStart"),
   highEnergyEnd: document.getElementById("highEnergyEnd"),
   lowEnergyStart: document.getElementById("lowEnergyStart"),
@@ -737,7 +811,6 @@ const elements = {
   confidenceScore: document.getElementById("confidenceScore"),
   failureMoment: document.getElementById("failureMoment"),
   failureWhy: document.getElementById("failureWhy"),
-  scrollCost: document.getElementById("scrollCost"),
   planningDebt: document.getElementById("planningDebt"),
   energyStrain: document.getElementById("energyStrain"),
   timeLeakCount: document.getElementById("timeLeakCount"),
@@ -762,6 +835,7 @@ const elements = {
   plannerShutdown: document.getElementById("plannerShutdown"),
   schedulePlan: document.getElementById("schedulePlan"),
   priorityPlan: document.getElementById("priorityPlan"),
+  scheduleConflicts: document.getElementById("scheduleConflicts"),
   efficiencyRules: document.getElementById("efficiencyRules"),
   plannerNotes: document.getElementById("plannerNotes"),
   trendTitle: document.getElementById("trendTitle"),
@@ -800,6 +874,7 @@ function plannerInput() {
     dayEndTime: elements.dayEndTime.value,
     schedule: elements.fixedSchedule.value.trim(),
     priorities: elements.priorities.value.trim(),
+    useEnergyHours: !elements.energyHoursSection.classList.contains("hidden"),
     highEnergyStart: elements.highEnergyStart.value,
     highEnergyEnd: elements.highEnergyEnd.value,
     lowEnergyStart: elements.lowEnergyStart.value,
@@ -808,7 +883,6 @@ function plannerInput() {
       .map((task) => ({
         title: task.title.trim(),
         duration: Number(task.duration),
-        energy: task.energy,
       }))
       .filter((task) => task.title && task.duration > 0),
   };
@@ -827,14 +901,6 @@ function renderTaskInputs() {
             <span>Duration</span>
             <input type="number" class="task-duration" min="15" step="15" value="${task.duration}" />
           </label>
-          <label>
-            <span>Energy needed</span>
-            <select class="task-energy">
-              <option value="high" ${task.energy === "high" ? "selected" : ""}>High</option>
-              <option value="medium" ${task.energy === "medium" ? "selected" : ""}>Medium</option>
-              <option value="low" ${task.energy === "low" ? "selected" : ""}>Low</option>
-            </select>
-          </label>
           <button type="button" class="small-button remove-task">Remove</button>
         </div>
       `
@@ -848,9 +914,6 @@ function renderTaskInputs() {
     });
     row.querySelector(".task-duration").addEventListener("input", (event) => {
       plannerTasks[index].duration = Number(event.target.value || 0);
-    });
-    row.querySelector(".task-energy").addEventListener("change", (event) => {
-      plannerTasks[index].energy = event.target.value;
     });
     row.querySelector(".remove-task").addEventListener("click", () => {
       plannerTasks.splice(index, 1);
@@ -912,7 +975,6 @@ function renderAutopsy(report) {
   elements.confidenceScore.textContent = `${Math.round(report.confidence * 100)}%`;
   elements.failureMoment.textContent = report.failurePoint.moment;
   elements.failureWhy.textContent = report.failurePoint.why;
-  elements.scrollCost.textContent = Math.round(report.metrics.scrollCost);
   elements.planningDebt.textContent = Math.round(report.metrics.planningDebt);
   elements.energyStrain.textContent = Math.round(report.metrics.energyStrain);
   elements.timeLeakCount.textContent = report.timeLeaks.length;
@@ -954,6 +1016,7 @@ function renderPlanner(report) {
   elements.plannerDeepWork.textContent = report.bestStartWindow;
   elements.plannerShutdown.textContent = report.shutdownTime;
   renderInsightList(elements.schedulePlan, report.suggestedSchedule);
+  renderInsightList(elements.scheduleConflicts, report.scheduleConflicts);
   elements.priorityPlan.innerHTML = report.editableSchedule && report.editableSchedule.length
     ? report.editableSchedule
         .map(
@@ -1058,6 +1121,8 @@ function renderHistory(history) {
         elements.dayEndTime.value = report.planner.dayEndTime || "22:30";
         elements.fixedSchedule.value = report.planner.schedule || "";
         elements.priorities.value = report.planner.priorities || "";
+        elements.energyHoursSection.classList.toggle("hidden", !report.planner.useEnergyHours);
+        elements.toggleEnergyBtn.textContent = report.planner.useEnergyHours ? "Hide Energy Hours" : "Add High-Energy Hours";
         elements.highEnergyStart.value = report.planner.highEnergyStart || "08:00";
         elements.highEnergyEnd.value = report.planner.highEnergyEnd || "12:00";
         elements.lowEnergyStart.value = report.planner.lowEnergyStart || "15:00";
@@ -1154,7 +1219,7 @@ function runAnalysis() {
 
   if (activeMode === "planner") {
     const input = plannerInput();
-    if (!input.schedule && !input.priorities) {
+    if (!input.schedule && !input.priorities && !input.tasks.length) {
       elements.priorities.focus();
       return;
     }
@@ -1181,6 +1246,8 @@ function loadSample(index = 0) {
   elements.dayLog.value = sample.text;
   elements.wakeTime.value = sample.wake;
   elements.dayEndTime.value = sample.end;
+  elements.energyHoursSection.classList.remove("hidden");
+  elements.toggleEnergyBtn.textContent = "Hide Energy Hours";
   elements.highEnergyStart.value = sample.highStart;
   elements.highEnergyEnd.value = sample.highEnd;
   elements.lowEnergyStart.value = sample.lowStart;
@@ -1230,6 +1297,8 @@ elements.clearBtn.addEventListener("click", () => {
   elements.dayLog.value = "";
   elements.fixedSchedule.value = "";
   elements.priorities.value = "";
+  elements.energyHoursSection.classList.add("hidden");
+  elements.toggleEnergyBtn.textContent = "Add High-Energy Hours";
   elements.highEnergyStart.value = "08:00";
   elements.highEnergyEnd.value = "12:00";
   elements.lowEnergyStart.value = "15:00";
@@ -1240,8 +1309,13 @@ elements.clearBtn.addEventListener("click", () => {
   elements.dayEndTime.value = "22:30";
 });
 elements.addTaskBtn.addEventListener("click", () => {
-  plannerTasks.push({ title: "", duration: 60, energy: "medium" });
+  plannerTasks.push({ title: "", duration: 60 });
   renderTaskInputs();
+});
+elements.toggleEnergyBtn.addEventListener("click", () => {
+  const shouldHide = !elements.energyHoursSection.classList.contains("hidden");
+  elements.energyHoursSection.classList.toggle("hidden", shouldHide);
+  elements.toggleEnergyBtn.textContent = shouldHide ? "Add High-Energy Hours" : "Hide Energy Hours";
 });
 elements.loadSampleBtn.addEventListener("click", () => loadSample(0));
 elements.shortReportBtn.addEventListener("click", () => setReportDepth("short"));
@@ -1258,7 +1332,7 @@ elements.dayLog.addEventListener("keydown", (event) => {
 });
 
 renderSamples();
-plannerTasks = [{ title: "", duration: 60, energy: "high" }];
+plannerTasks = [{ title: "", duration: 60 }];
 renderTaskInputs();
 const initialHistory = loadHistory();
 renderHistory(initialHistory);

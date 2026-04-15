@@ -640,6 +640,27 @@ a {
   border: 1px solid var(--line);
 }
 
+.energy-toggle-box {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--line);
+}
+
+.planner-helper {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+.energy-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
 .task-list {
   display: grid;
   gap: 12px;
@@ -657,7 +678,7 @@ a {
 }
 
 .task-row {
-  grid-template-columns: 1.6fr 110px 130px auto;
+  grid-template-columns: 1.8fr 120px auto;
   align-items: end;
 }
 
@@ -668,7 +689,6 @@ a {
 }
 
 .task-row input,
-.task-row select,
 .schedule-row input {
   width: 100%;
   border-radius: 14px;
