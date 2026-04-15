@@ -633,6 +633,78 @@ a {
   gap: 14px;
 }
 
+.task-builder {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--line);
+}
+
+.task-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.task-row,
+.schedule-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(17, 17, 17, 0.06);
+}
+
+.task-row {
+  grid-template-columns: 1.6fr 110px 130px auto;
+  align-items: end;
+}
+
+.task-row label,
+.schedule-row label {
+  display: grid;
+  gap: 6px;
+}
+
+.task-row input,
+.task-row select,
+.schedule-row input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.95);
+  padding: 10px 12px;
+}
+
+.small-button {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.9);
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.small-button:hover {
+  color: var(--purple-deep);
+  border-color: rgba(143, 77, 255, 0.25);
+}
+
+.schedule-adjustments {
+  gap: 14px;
+}
+
+.schedule-row {
+  grid-template-columns: 1.1fr 1.1fr 1.6fr auto;
+  align-items: end;
+}
+
+.schedule-controls {
+  display: flex;
+  gap: 8px;
+}
+
 .planner-grid label {
   display: grid;
   gap: 8px;
@@ -991,6 +1063,15 @@ a {
   .progress-metrics,
   .planner-grid {
     grid-template-columns: 1fr;
+  }
+
+  .task-row,
+  .schedule-row {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-controls {
+    flex-wrap: wrap;
   }
 
   .topbar-nav,

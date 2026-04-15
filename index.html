@@ -180,6 +180,29 @@
                     placeholder="Finish lab report, revise for quiz, reply to internship email..."
                   ></textarea>
                 </label>
+                <label>
+                  <span>High-energy hours start</span>
+                  <input id="highEnergyStart" type="time" value="08:00" />
+                </label>
+                <label>
+                  <span>High-energy hours end</span>
+                  <input id="highEnergyEnd" type="time" value="12:00" />
+                </label>
+                <label>
+                  <span>Low-energy hours start</span>
+                  <input id="lowEnergyStart" type="time" value="15:00" />
+                </label>
+                <label>
+                  <span>Low-energy hours end</span>
+                  <input id="lowEnergyEnd" type="time" value="17:30" />
+                </label>
+                <div class="planner-wide task-builder">
+                  <div class="card-title-row">
+                    <h3>Tasks For Tomorrow</h3>
+                    <button id="addTaskBtn" type="button" class="ghost-button">Add Task</button>
+                  </div>
+                  <div id="taskList" class="task-list"></div>
+                </div>
               </div>
             </section>
 
@@ -292,6 +315,40 @@
           </section>
 
           <section class="results-grid">
+            <article class="insight-card accent-green">
+              <div class="card-title-row">
+                <h4>What Went Well?</h4>
+                <span class="count-pill">Wins</span>
+              </div>
+              <div id="wentWell" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-red">
+              <div class="card-title-row">
+                <h4>What Didn't Go As Planned?</h4>
+                <span class="count-pill">Issues</span>
+              </div>
+              <div id="didntGo" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-blue">
+              <div class="card-title-row">
+                <h4>What Should Change Tomorrow?</h4>
+                <span class="count-pill">Next</span>
+              </div>
+              <div id="changeTomorrow" class="insight-list"></div>
+            </article>
+
+            <article class="insight-card accent-sand">
+              <div class="card-title-row">
+                <h4>Focus vs Wasted Time</h4>
+                <span class="count-pill">Analytics</span>
+              </div>
+              <div id="focusAnalytics" class="insight-list"></div>
+            </article>
+          </section>
+
+          <section class="results-grid">
             <article class="insight-card accent-red">
               <div class="card-title-row">
                 <h4>Time Leaks</h4>
@@ -328,7 +385,7 @@
           <section id="deepSection" class="results-grid hidden">
             <article class="insight-card accent-ink">
               <div class="card-title-row">
-                <h4>Failure Timeline</h4>
+                <h4>Timeline Breakdown</h4>
                 <span class="count-pill">Quantified</span>
               </div>
               <div id="failureTimeline" class="insight-list"></div>
@@ -395,10 +452,10 @@
 
             <article class="insight-card accent-green">
               <div class="card-title-row">
-                <h4>Priority Handling</h4>
-                <span class="count-pill">Focus</span>
+                <h4>Live Adjustments</h4>
+                <span class="count-pill">Editable</span>
               </div>
-              <div id="priorityPlan" class="insight-list"></div>
+              <div id="priorityPlan" class="insight-list schedule-adjustments"></div>
             </article>
 
             <article class="insight-card accent-amber">

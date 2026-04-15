@@ -11,8 +11,17 @@ const sampleLogs = [
       "I woke up late, checked my phone for an hour, skipped breakfast, rushed to class, tried to study between lectures, kept reopening my notes and YouTube, forgot a quiz was due, and by 4 PM I felt wired and useless.",
     wake: "07:20",
     end: "22:45",
+    highStart: "08:00",
+    highEnd: "12:00",
+    lowStart: "15:00",
+    lowEnd: "17:00",
     schedule: "Class 10 AM to 12 PM, library from 2 PM, gym at 6 PM",
     priorities: "Finish quiz review, submit lab draft, read chapter notes",
+    tasks: [
+      { title: "Finish quiz review", duration: 90, energy: "high" },
+      { title: "Submit lab draft", duration: 75, energy: "high" },
+      { title: "Read chapter notes", duration: 45, energy: "low" },
+    ],
   },
   {
     label: "Context-Switch Spiral",
@@ -20,8 +29,17 @@ const sampleLogs = [
       "I started three tasks before finishing one, kept replying to Slack right away, had six tabs open for one assignment, skipped lunch because I thought I was behind, and spent the evening staring at work without getting traction.",
     wake: "06:50",
     end: "23:00",
+    highStart: "08:30",
+    highEnd: "11:30",
+    lowStart: "16:00",
+    lowEnd: "18:00",
     schedule: "Work block before 9, team sync at 11, client edits due by 5",
     priorities: "Complete client revision, send invoice, draft presentation outline",
+    tasks: [
+      { title: "Complete client revision", duration: 120, energy: "high" },
+      { title: "Send invoice", duration: 25, energy: "low" },
+      { title: "Draft presentation outline", duration: 60, energy: "medium" },
+    ],
   },
   {
     label: "Silent Burnout",
@@ -29,8 +47,17 @@ const sampleLogs = [
       "I got through the whole day technically working, but everything felt heavy. I procrastinated starting hard work, drank too much coffee, had no real break, made tiny mistakes in things I normally do well, and crashed after dinner.",
     wake: "07:45",
     end: "22:00",
+    highStart: "09:00",
+    highEnd: "12:30",
+    lowStart: "15:30",
+    lowEnd: "17:30",
     schedule: "Morning meetings, project block 1 to 4, dinner at 7",
     priorities: "Finish proposal deck, review hiring notes, clear inbox backlog",
+    tasks: [
+      { title: "Finish proposal deck", duration: 100, energy: "high" },
+      { title: "Review hiring notes", duration: 40, energy: "medium" },
+      { title: "Clear inbox backlog", duration: 30, energy: "low" },
+    ],
   },
 ];
 
@@ -52,6 +79,18 @@ const analyzer = {
       .split(/[,\n]/)
       .map((item) => item.trim())
       .filter(Boolean);
+  },
+
+  extractTimes(text) {
+    const matches = [...text.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi)];
+    return matches
+      .map((match) => ({
+        raw: match[0],
+        minutes: this.parseTimeToken(match[0]),
+        index: match.index || 0,
+      }))
+      .filter((item) => item.minutes !== null)
+      .sort((a, b) => a.index - b.index);
   },
 
   timeToMinutes(value = "07:30") {
@@ -152,6 +191,18 @@ const analyzer = {
     return windows;
   },
 
+  clampToWindow(start, duration, windows) {
+    for (const window of windows) {
+      const adjustedStart = Math.max(start, window.start);
+      if (adjustedStart + duration <= window.end) {
+        return { start: adjustedStart, end: adjustedStart + duration };
+      }
+    }
+    const fallback = windows[windows.length - 1] || { start, end: start + duration };
+    const safeStart = Math.max(fallback.start, fallback.end - duration);
+    return { start: safeStart, end: safeStart + duration };
+  },
+
   buildTrend(rootCauses, history, type) {
     const sameType = history.filter((item) => item.type === type);
     if (!sameType.length) {
@@ -194,6 +245,7 @@ const analyzer = {
     const features = this.detectFeatures(normalized);
     const wakeMinutes = this.timeToMinutes(planInput.wakeTime || "07:30");
     const endMinutes = this.timeToMinutes(planInput.dayEndTime || "22:30");
+    const extractedTimes = this.extractTimes(normalized);
     const scrollCost = (features.phoneDrift > 0 ? 18 + features.phoneDrift * 8 : 8) + (features.lateStart > 0 ? 10 : 0);
     const planningDebt =
       (features.planningDebt > 0 ? 16 + features.planningDebt * 5 : 10) +
@@ -232,6 +284,114 @@ const analyzer = {
     ].filter(Boolean);
 
     const dominantSummary = dominantSignals.slice(0, 2).join(" plus ");
+    const focusMinutes = Math.max(45, Math.round((endMinutes - wakeMinutes) * 0.42 - scrollCost * 0.9 - planningDebt * 0.55));
+    const wastedMinutes = Math.max(35, Math.round(scrollCost * 1.8 + planningDebt * 1.2 + energyStrain * 0.9));
+    const explicitWake = extractedTimes[0]?.minutes || wakeMinutes;
+
+    const timeline = [
+      {
+        time: explicitWake,
+        title: `${this.minutesToClock(explicitWake)} | Day begins`,
+        detail: features.lateStart > 0
+          ? "Wake-up happened later than ideal, immediately shrinking recovery and planning margin."
+          : "The day opened with a clean chance to set direction.",
+      },
+      features.phoneDrift > 0
+        ? {
+            time: explicitWake + 15,
+            title: `${this.minutesToClock(explicitWake + 15)} | Phone usage begins`,
+            detail: "Critical divergence: passive input likely displaced setup and early intention.",
+          }
+        : null,
+      {
+        time: firstFailureMinute,
+        title: `${this.minutesToClock(firstFailureMinute)} | First meaningful break point`,
+        detail:
+          features.phoneDrift > 0
+            ? "Early phone drift changed the trajectory before the day had structure."
+            : features.avoidance > 0
+              ? "The hardest task was delayed, creating drag that spread through the day."
+              : "The day likely shifted from directed to reactive here.",
+      },
+      features.planningDebt > 0
+        ? {
+            time: firstFailureMinute + 35,
+            title: `${this.minutesToClock(firstFailureMinute + 35)} | Planning skipped or weakened`,
+            detail: "The next steps had to be re-decided repeatedly instead of already being clear.",
+          }
+        : null,
+      features.contextSwitching > 0
+        ? {
+            time: firstFailureMinute + 80,
+            title: `${this.minutesToClock(firstFailureMinute + 80)} | Task switching begins`,
+            detail: "Attention started fragmenting across tabs, tasks, or channels.",
+          }
+        : null,
+      {
+        time: endMinutes - 150,
+        title: `${this.minutesToClock(endMinutes - 150)} | Energy drop becomes visible`,
+        detail: "Late-day fatigue or overload likely made simple work feel heavier than it should have.",
+      },
+    ].filter(Boolean).sort((a, b) => a.time - b.time).map(({ title, detail }) => ({ title, detail }));
+
+    const wentWell = [
+      !features.lateStart
+        ? {
+            title: "The day had a usable opening window",
+            detail: "There was at least some early capacity to build structure before drift took over.",
+          }
+        : null,
+      planInput.schedule
+        ? {
+            title: "There were fixed anchors in the day",
+            detail: "Existing commitments gave the day some structure to build around.",
+          }
+        : null,
+      focusMinutes > wastedMinutes
+        ? {
+            title: "You still preserved some real focus time",
+            detail: `Estimated focused work: about ${focusMinutes} minutes, which means the day was not a total loss.`,
+          }
+        : {
+            title: "You kept the day moving despite friction",
+            detail: "Even with drag and overload, the day still had usable blocks that can be recovered better tomorrow.",
+          },
+    ].filter(Boolean);
+
+    const didntGo = [
+      {
+        title: `Focus time vs wasted time`,
+        detail: `Estimated focused work: ${focusMinutes} min. Estimated wasted or low-value time: ${wastedMinutes} min.`,
+      },
+      {
+        title: `Critical divergence at ${this.minutesToClock(firstFailureMinute)}`,
+        detail:
+          features.phoneDrift > 0
+            ? "Phone use took over before the day had a plan."
+            : features.avoidance > 0
+              ? "The hardest task was delayed until the day lost momentum."
+              : "Direction weakened early, which made the rest of the day reactive.",
+      },
+      {
+        title: "Execution degraded as the day progressed",
+        detail: "Planning debt, switching, or energy strain kept compounding instead of being reset.",
+      },
+    ];
+
+    const changeTomorrow = [
+      {
+        title: "Protect the first 30 minutes",
+        detail: "Use that window for food, water, and deciding the first task before anything reactive enters the day.",
+      },
+      {
+        title: "Pre-decide the first work lane",
+        detail: "Start the day already knowing what the first meaningful block is, so the day does not begin with choice friction.",
+      },
+      {
+        title: "Insert one reset before the afternoon",
+        detail: "Use a deliberate midday pause to stop morning chaos from spilling into the rest of the day.",
+      },
+    ];
 
     const rootCauses = [
       {
@@ -280,6 +440,10 @@ const analyzer = {
           : "The day appears to have drifted once tasks stopped being pre-decided and attention had to keep renegotiating priorities.",
       },
       metrics: { scrollCost, planningDebt, energyStrain },
+      analytics: { focusMinutes, wastedMinutes },
+      wentWell,
+      didntGo,
+      changeTomorrow,
       timeLeaks: [
         {
           title: `Reactive screen drift (+${scrollCost} drag points)`,
@@ -325,28 +489,7 @@ const analyzer = {
           detail: "Define the wake time, your first work block, and one energy checkpoint tonight.",
         },
       ],
-      timeline: [
-        {
-          title: `${this.minutesToClock(wakeMinutes)} | Day setup window`,
-          detail: features.lateStart
-            ? "The day began behind schedule, which shrank the margin for calm setup immediately."
-            : "This was the best window to set direction before the day got noisy.",
-        },
-        {
-          title: `${this.minutesToClock(firstFailureMinute)} | Likely first break point`,
-          detail: features.phoneDrift > 0
-            ? `Phone drift likely consumed the first planning block and cost about ${scrollCost} focus points.`
-            : "Early structure appears to have broken here, which made later choices more reactive.",
-        },
-        {
-          title: `${this.minutesToClock(firstFailureMinute + 180)} | Compounding phase`,
-          detail: "Planning debt and task switching appear to interact here, which made recovery more expensive than prevention.",
-        },
-        {
-          title: `${this.minutesToClock(endMinutes - 120)} | Fatigue zone`,
-          detail: "Late-day executive control likely weakened here, raising the odds of strain-based mistakes.",
-        },
-      ],
+      timeline,
       tomorrowPlan: [
         {
           title: `${planInput.wakeTime || "07:30"} | Wake and protect the first 30 minutes`,
@@ -385,16 +528,52 @@ const analyzer = {
     const focusHours = Math.max(2.5, Math.min(7.5, (usableMinutes - 240) / 60));
     const priorities = this.splitList(planInput.priorities);
     const scheduleItems = commitments.length ? commitments.map((item) => item.label) : this.splitList(planInput.schedule);
+    const tasks = planInput.tasks.filter((task) => task.title && task.duration > 0);
     const planQuality = Math.min(
       96,
-      44 + priorities.length * 9 + scheduleItems.length * 7 + (focusHours - 2) * 4 + (openWindows.length > 1 ? 6 : 0)
+      40 + priorities.length * 7 + scheduleItems.length * 6 + tasks.length * 5 + (focusHours - 2) * 4 + (openWindows.length > 1 ? 6 : 0)
     );
+    const highEnergyWindow = {
+      start: this.timeToMinutes(planInput.highEnergyStart || "08:00"),
+      end: this.timeToMinutes(planInput.highEnergyEnd || "12:00"),
+    };
+    const lowEnergyWindow = {
+      start: this.timeToMinutes(planInput.lowEnergyStart || "15:00"),
+      end: this.timeToMinutes(planInput.lowEnergyEnd || "17:30"),
+    };
+    const availableWindows = openWindows.length ? openWindows : [{ start: wakeMinutes + 30, end: endMinutes - 30 }];
 
-    const allocatedPriorityPlan = priorities.length
-      ? priorities.slice(0, 4).map((priority, index) => {
-          const window = openWindows[Math.min(index, Math.max(0, openWindows.length - 1))] || bestWindow;
+    const scheduledTasks = tasks
+      .slice()
+      .sort((a, b) => {
+        const rank = { high: 0, medium: 1, low: 2 };
+        return (rank[a.energy] ?? 1) - (rank[b.energy] ?? 1);
+      })
+      .map((task, index) => {
+        const preferredStart =
+          task.energy === "high"
+            ? highEnergyWindow.start
+            : task.energy === "low"
+              ? lowEnergyWindow.start
+              : availableWindows[Math.min(index, availableWindows.length - 1)].start;
+        const slot = this.clampToWindow(preferredStart, task.duration, availableWindows);
+        return {
+          id: `${task.title}-${index}-${slot.start}`,
+          title: task.title,
+          energy: task.energy,
+          start: slot.start,
+          end: slot.end,
+        };
+      })
+      .sort((a, b) => a.start - b.start);
+
+    const allocatedPriorityPlan = (tasks.length ? tasks : priorities.map((title) => ({ title, duration: 60, energy: "medium" }))).length
+      ? (tasks.length ? tasks : priorities.map((title) => ({ title, duration: 60, energy: "medium" }))).slice(0, 4).map((task, index) => {
+          const window = scheduledTasks[index]
+            ? { start: scheduledTasks[index].start, end: scheduledTasks[index].end }
+            : openWindows[Math.min(index, Math.max(0, openWindows.length - 1))] || bestWindow;
           return {
-            title: `Priority ${index + 1} | ${priority}`,
+            title: `Priority ${index + 1} | ${task.title}`,
             detail:
               index === 0
                 ? `Place this in ${this.minutesToClock(window.start)} to ${this.minutesToClock(Math.min(window.start + 90, window.end))}, your strongest open block.`
@@ -418,6 +597,11 @@ const analyzer = {
           : "Reserve this block for the hardest task before lower-value noise enters the day.",
         start: deepWorkStart,
       },
+      ...scheduledTasks.map((task) => ({
+        title: `${this.minutesToClock(task.start)}-${this.minutesToClock(task.end)} | ${task.title}`,
+        detail: `${task.energy} energy task`,
+        start: task.start,
+      })),
       ...commitments.slice(0, 3).map((item) => ({
         title: `${this.minutesToClock(item.start)}-${this.minutesToClock(item.end)} | Fixed commitment`,
         detail: item.label,
@@ -461,12 +645,13 @@ const analyzer = {
           : "This is the earliest clean slot after waking where cognitive energy is still high and the day has not yet been fragmented.",
       shutdownTime: this.minutesToClock(shutdown),
       suggestedSchedule: orderedSchedule,
+      editableSchedule: scheduledTasks,
       priorityPlan: priorities.length
         ? allocatedPriorityPlan
         : [
             {
               title: "No priorities entered",
-              detail: "Add 2 to 4 concrete priorities so the planner can schedule a tighter day.",
+              detail: "Add task blocks or 2 to 4 concrete priorities so the planner can schedule a tighter day.",
             },
           ],
       efficiencyRules: [
@@ -497,7 +682,7 @@ const analyzer = {
         },
         {
           title: "Planning logic",
-          detail: "The planner front-loads hard work, inserts a reset before the afternoon, and uses a shutdown window so tomorrow does not begin in friction.",
+          detail: "The planner front-loads hard work, considers high and low energy windows, routes around fixed commitments, and uses a shutdown window so tomorrow does not begin in friction.",
         },
       ],
       trend: this.buildTrend([], history, "planner"),
@@ -533,6 +718,12 @@ const elements = {
   dayEndTime: document.getElementById("dayEndTime"),
   fixedSchedule: document.getElementById("fixedSchedule"),
   priorities: document.getElementById("priorities"),
+  highEnergyStart: document.getElementById("highEnergyStart"),
+  highEnergyEnd: document.getElementById("highEnergyEnd"),
+  lowEnergyStart: document.getElementById("lowEnergyStart"),
+  lowEnergyEnd: document.getElementById("lowEnergyEnd"),
+  addTaskBtn: document.getElementById("addTaskBtn"),
+  taskList: document.getElementById("taskList"),
   resultsHeading: document.getElementById("resultsHeading"),
   analysisStamp: document.getElementById("analysisStamp"),
   autopsyControls: document.getElementById("autopsyControls"),
@@ -553,6 +744,10 @@ const elements = {
   burnoutCount: document.getElementById("burnoutCount"),
   timeLeaks: document.getElementById("timeLeaks"),
   burnoutSignals: document.getElementById("burnoutSignals"),
+  wentWell: document.getElementById("wentWell"),
+  didntGo: document.getElementById("didntGo"),
+  changeTomorrow: document.getElementById("changeTomorrow"),
+  focusAnalytics: document.getElementById("focusAnalytics"),
   rootCauses: document.getElementById("rootCauses"),
   behaviorPatches: document.getElementById("behaviorPatches"),
   failureTimeline: document.getElementById("failureTimeline"),
@@ -575,6 +770,8 @@ const elements = {
 
 let activeMode = "autopsy";
 let reportDepth = "short";
+let plannerTasks = [];
+let currentPlannerReport = null;
 
 function loadHistory() {
   try {
@@ -603,11 +800,67 @@ function plannerInput() {
     dayEndTime: elements.dayEndTime.value,
     schedule: elements.fixedSchedule.value.trim(),
     priorities: elements.priorities.value.trim(),
+    highEnergyStart: elements.highEnergyStart.value,
+    highEnergyEnd: elements.highEnergyEnd.value,
+    lowEnergyStart: elements.lowEnergyStart.value,
+    lowEnergyEnd: elements.lowEnergyEnd.value,
+    tasks: plannerTasks
+      .map((task) => ({
+        title: task.title.trim(),
+        duration: Number(task.duration),
+        energy: task.energy,
+      }))
+      .filter((task) => task.title && task.duration > 0),
   };
 }
 
+function renderTaskInputs() {
+  elements.taskList.innerHTML = plannerTasks
+    .map(
+      (task, index) => `
+        <div class="task-row" data-task-index="${index}">
+          <label>
+            <span>Task</span>
+            <input type="text" class="task-title" value="${task.title}" placeholder="Write essay draft" />
+          </label>
+          <label>
+            <span>Duration</span>
+            <input type="number" class="task-duration" min="15" step="15" value="${task.duration}" />
+          </label>
+          <label>
+            <span>Energy needed</span>
+            <select class="task-energy">
+              <option value="high" ${task.energy === "high" ? "selected" : ""}>High</option>
+              <option value="medium" ${task.energy === "medium" ? "selected" : ""}>Medium</option>
+              <option value="low" ${task.energy === "low" ? "selected" : ""}>Low</option>
+            </select>
+          </label>
+          <button type="button" class="small-button remove-task">Remove</button>
+        </div>
+      `
+    )
+    .join("");
+
+  document.querySelectorAll(".task-row").forEach((row) => {
+    const index = Number(row.dataset.taskIndex);
+    row.querySelector(".task-title").addEventListener("input", (event) => {
+      plannerTasks[index].title = event.target.value;
+    });
+    row.querySelector(".task-duration").addEventListener("input", (event) => {
+      plannerTasks[index].duration = Number(event.target.value || 0);
+    });
+    row.querySelector(".task-energy").addEventListener("change", (event) => {
+      plannerTasks[index].energy = event.target.value;
+    });
+    row.querySelector(".remove-task").addEventListener("click", () => {
+      plannerTasks.splice(index, 1);
+      renderTaskInputs();
+    });
+  });
+}
+
 function renderInsightList(container, items) {
-  container.innerHTML = items
+  container.innerHTML = (items || [])
     .map(
       (item) => `
         <div class="insight-item">
@@ -664,6 +917,19 @@ function renderAutopsy(report) {
   elements.energyStrain.textContent = Math.round(report.metrics.energyStrain);
   elements.timeLeakCount.textContent = report.timeLeaks.length;
   elements.burnoutCount.textContent = report.burnoutSignals.length;
+  renderInsightList(elements.wentWell, report.wentWell);
+  renderInsightList(elements.didntGo, report.didntGo);
+  renderInsightList(elements.changeTomorrow, report.changeTomorrow);
+  renderInsightList(elements.focusAnalytics, [
+    {
+      title: "Estimated focused work",
+      detail: `${report.analytics.focusMinutes} minutes of meaningful focus time.`,
+    },
+    {
+      title: "Estimated wasted or low-value time",
+      detail: `${report.analytics.wastedMinutes} minutes lost to drift, friction, or scattered execution.`,
+    },
+  ]);
   renderInsightList(elements.timeLeaks, report.timeLeaks);
   renderInsightList(elements.burnoutSignals, report.burnoutSignals);
   renderInsightList(elements.rootCauses, report.rootCauses);
@@ -674,6 +940,7 @@ function renderAutopsy(report) {
 }
 
 function renderPlanner(report) {
+  currentPlannerReport = report;
   elements.resultsHeading.textContent = "Tomorrow Plan";
   elements.autopsyControls.classList.add("hidden");
   elements.autopsyResultsSection.classList.add("hidden");
@@ -687,9 +954,64 @@ function renderPlanner(report) {
   elements.plannerDeepWork.textContent = report.bestStartWindow;
   elements.plannerShutdown.textContent = report.shutdownTime;
   renderInsightList(elements.schedulePlan, report.suggestedSchedule);
-  renderInsightList(elements.priorityPlan, report.priorityPlan);
+  elements.priorityPlan.innerHTML = report.editableSchedule && report.editableSchedule.length
+    ? report.editableSchedule
+        .map(
+          (task, index) => `
+            <div class="schedule-row" data-schedule-index="${index}">
+              <label>
+                <span>Start</span>
+                <input type="time" class="schedule-start" value="${String(Math.floor(task.start / 60)).padStart(2, "0")}:${String(task.start % 60).padStart(2, "0")}" />
+              </label>
+              <label>
+                <span>End</span>
+                <input type="time" class="schedule-end" value="${String(Math.floor(task.end / 60)).padStart(2, "0")}:${String(task.end % 60).padStart(2, "0")}" />
+              </label>
+              <label>
+                <span>Task</span>
+                <input type="text" class="schedule-title" value="${task.title}" />
+              </label>
+              <div class="schedule-controls">
+                <button type="button" class="small-button shift-earlier">-15m</button>
+                <button type="button" class="small-button shift-later">+15m</button>
+              </div>
+            </div>
+          `
+        )
+        .join("")
+    : `<div class="insight-item"><strong>No task blocks yet</strong><p>Add tasks in planner mode to get a fully scheduled, editable day.</p></div>`;
+  bindScheduleAdjustments();
   renderInsightList(elements.efficiencyRules, report.efficiencyRules);
   renderInsightList(elements.plannerNotes, report.notes);
+}
+
+function bindScheduleAdjustments() {
+  document.querySelectorAll(".schedule-row").forEach((row) => {
+    const index = Number(row.dataset.scheduleIndex);
+    const startInput = row.querySelector(".schedule-start");
+    const endInput = row.querySelector(".schedule-end");
+    const titleInput = row.querySelector(".schedule-title");
+    const applyInputs = () => {
+      const [sh, sm] = startInput.value.split(":").map(Number);
+      const [eh, em] = endInput.value.split(":").map(Number);
+      currentPlannerReport.editableSchedule[index].start = sh * 60 + sm;
+      currentPlannerReport.editableSchedule[index].end = eh * 60 + em;
+      currentPlannerReport.editableSchedule[index].title = titleInput.value;
+    };
+    startInput.addEventListener("change", applyInputs);
+    endInput.addEventListener("change", applyInputs);
+    titleInput.addEventListener("input", applyInputs);
+    row.querySelector(".shift-earlier").addEventListener("click", () => {
+      currentPlannerReport.editableSchedule[index].start -= 15;
+      currentPlannerReport.editableSchedule[index].end -= 15;
+      renderPlanner(currentPlannerReport);
+    });
+    row.querySelector(".shift-later").addEventListener("click", () => {
+      currentPlannerReport.editableSchedule[index].start += 15;
+      currentPlannerReport.editableSchedule[index].end += 15;
+      renderPlanner(currentPlannerReport);
+    });
+  });
 }
 
 function renderReport(report) {
@@ -736,6 +1058,12 @@ function renderHistory(history) {
         elements.dayEndTime.value = report.planner.dayEndTime || "22:30";
         elements.fixedSchedule.value = report.planner.schedule || "";
         elements.priorities.value = report.planner.priorities || "";
+        elements.highEnergyStart.value = report.planner.highEnergyStart || "08:00";
+        elements.highEnergyEnd.value = report.planner.highEnergyEnd || "12:00";
+        elements.lowEnergyStart.value = report.planner.lowEnergyStart || "15:00";
+        elements.lowEnergyEnd.value = report.planner.lowEnergyEnd || "17:30";
+        plannerTasks = report.planner.tasks ? report.planner.tasks.map((task) => ({ ...task })) : [];
+        renderTaskInputs();
       }
       if (report.rawLog) elements.dayLog.value = report.rawLog;
       setMode(report.type);
@@ -853,8 +1181,14 @@ function loadSample(index = 0) {
   elements.dayLog.value = sample.text;
   elements.wakeTime.value = sample.wake;
   elements.dayEndTime.value = sample.end;
+  elements.highEnergyStart.value = sample.highStart;
+  elements.highEnergyEnd.value = sample.highEnd;
+  elements.lowEnergyStart.value = sample.lowStart;
+  elements.lowEnergyEnd.value = sample.lowEnd;
   elements.fixedSchedule.value = sample.schedule;
   elements.priorities.value = sample.priorities;
+  plannerTasks = sample.tasks.map((task) => ({ ...task }));
+  renderTaskInputs();
   setMode("autopsy");
   document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -896,8 +1230,18 @@ elements.clearBtn.addEventListener("click", () => {
   elements.dayLog.value = "";
   elements.fixedSchedule.value = "";
   elements.priorities.value = "";
+  elements.highEnergyStart.value = "08:00";
+  elements.highEnergyEnd.value = "12:00";
+  elements.lowEnergyStart.value = "15:00";
+  elements.lowEnergyEnd.value = "17:30";
+  plannerTasks = [];
+  renderTaskInputs();
   elements.wakeTime.value = "07:30";
   elements.dayEndTime.value = "22:30";
+});
+elements.addTaskBtn.addEventListener("click", () => {
+  plannerTasks.push({ title: "", duration: 60, energy: "medium" });
+  renderTaskInputs();
 });
 elements.loadSampleBtn.addEventListener("click", () => loadSample(0));
 elements.shortReportBtn.addEventListener("click", () => setReportDepth("short"));
@@ -914,6 +1258,8 @@ elements.dayLog.addEventListener("keydown", (event) => {
 });
 
 renderSamples();
+plannerTasks = [{ title: "", duration: 60, energy: "high" }];
+renderTaskInputs();
 const initialHistory = loadHistory();
 renderHistory(initialHistory);
 renderHistoryChart(initialHistory);
