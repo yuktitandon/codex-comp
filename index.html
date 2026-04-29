@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DayDebug</title>
+    <link rel="icon" type="image/svg+xml" href="./daydebug-logo-mirror-d.svg" />
+    <link rel="apple-touch-icon" href="./daydebug-logo-mirror-d.svg" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -11,7 +13,7 @@
       <section id="landingView" class="landing-view">
         <header class="topbar">
           <div class="brand-lockup">
-            <img src="./daydebug-logo.svg" alt="DayDebug logo" class="brand-logo" />
+            <img src="./daydebug-logo-mirror-d.svg" alt="DayDebug logo" class="brand-logo" />
             <span class="brand-name">DayDebug</span>
           </div>
           <nav class="topbar-nav">
@@ -158,14 +160,16 @@
 
             <section id="plannerInputSection" class="input-mode planner-form hidden">
               <div class="planner-grid">
-                <label>
-                  <span>Wake up time</span>
-                  <input id="wakeTime" type="time" value="07:30" />
-                </label>
-                <label>
-                  <span>Day end time</span>
-                  <input id="dayEndTime" type="time" value="22:30" />
-                </label>
+                <div class="planner-inline-row planner-wide">
+                  <label>
+                    <span>Wake up time</span>
+                    <input id="wakeTime" type="time" value="07:30" />
+                  </label>
+                  <label>
+                    <span>Day end time</span>
+                    <input id="dayEndTime" type="time" value="22:30" />
+                  </label>
+                </div>
                 <label class="planner-wide">
                   <span>Fixed commitments</span>
                   <textarea
@@ -254,7 +258,7 @@
           <button id="backBtn" class="ghost-button">Go Back</button>
           <div class="results-topbar-meta">
             <div class="results-brand-mark">
-              <img src="./daydebug-logo.svg" alt="DayDebug logo" class="results-brand-logo" />
+              <img src="./daydebug-logo-mirror-d.svg" alt="DayDebug logo" class="results-brand-logo" />
               <span>DayDebug</span>
             </div>
             <p class="eyebrow">RESULTS</p>
@@ -310,30 +314,6 @@
                 <span class="count-pill">Avoid</span>
               </div>
               <div id="avoidTomorrow" class="insight-list"></div>
-            </article>
-          </section>
-
-          <section class="results-grid">
-            <article class="insight-card accent-sand">
-              <div class="card-title-row">
-                <h4>Focus vs Wasted Time</h4>
-                <span class="count-pill">Analytics</span>
-              </div>
-              <div id="focusAnalytics" class="insight-list"></div>
-            </article>
-            <article class="insight-card accent-ink">
-              <div class="card-title-row">
-                <h4>Timeline Breakdown</h4>
-                <span class="count-pill">When</span>
-              </div>
-              <div id="failureTimeline" class="insight-list"></div>
-            </article>
-            <article class="insight-card accent-sand">
-              <div class="card-title-row">
-                <h4>Tomorrow Plan</h4>
-                <span class="count-pill">Next Day</span>
-              </div>
-              <div id="tomorrowPlan" class="insight-list"></div>
             </article>
           </section>
         </section>

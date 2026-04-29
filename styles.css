@@ -100,6 +100,7 @@ a {
   height: 40px;
   display: block;
   object-fit: contain;
+  flex: 0 0 40px;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(111, 43, 255, 0.18);
   transition: transform 180ms ease, box-shadow 180ms ease;
@@ -640,6 +641,12 @@ a {
   gap: 12px;
 }
 
+.planner-inline-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .energy-toggle-box {
   padding: 14px 16px;
   border-radius: 20px;
@@ -788,6 +795,7 @@ a {
   height: 28px;
   display: block;
   object-fit: contain;
+  flex: 0 0 28px;
   border-radius: 9px;
   box-shadow: 0 8px 20px rgba(111, 43, 255, 0.16);
 }
@@ -962,6 +970,10 @@ a {
   .hero-points,
   .sample-list,
   .planner-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-inline-row {
     grid-template-columns: 1fr;
   }
 

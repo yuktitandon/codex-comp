@@ -839,9 +839,6 @@ const elements = {
   didntGo: document.getElementById("didntGo"),
   changeTomorrow: document.getElementById("changeTomorrow"),
   avoidTomorrow: document.getElementById("avoidTomorrow"),
-  focusAnalytics: document.getElementById("focusAnalytics"),
-  failureTimeline: document.getElementById("failureTimeline"),
-  tomorrowPlan: document.getElementById("tomorrowPlan"),
   plannerSummary: document.getElementById("plannerSummary"),
   bestStartWindow: document.getElementById("bestStartWindow"),
   bestStartWhy: document.getElementById("bestStartWhy"),
@@ -958,18 +955,6 @@ function renderAutopsy(report) {
   renderInsightList(elements.didntGo, report.didntGo);
   renderInsightList(elements.changeTomorrow, report.changeTomorrow);
   renderInsightList(elements.avoidTomorrow, report.avoidTomorrow);
-  renderInsightList(elements.focusAnalytics, [
-    {
-      title: "Estimated focused work",
-      detail: `${report.analytics.focusMinutes} minutes of meaningful focus time.`,
-    },
-    {
-      title: "Estimated wasted or low-value time",
-      detail: `${report.analytics.wastedMinutes} minutes lost to drift, friction, or scattered execution.`,
-    },
-  ]);
-  renderInsightList(elements.failureTimeline, report.timeline);
-  renderInsightList(elements.tomorrowPlan, report.tomorrowPlan);
 }
 
 function renderPlanner(report) {
