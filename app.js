@@ -396,20 +396,20 @@ const analyzer = {
     const didntGo = [
       {
         title: `Focus time vs wasted time`,
-        detail: `Estimated focused work: ${focusMinutes} min. Estimated wasted or low-value time: ${wastedMinutes} min.`,
+        detail: `Estimated focused work: ${focusMinutes} min. Estimated wasted or low-value time: ${wastedMinutes} min. A cleaner day would have protected the first focused block before low-value drift started.`,
       },
       {
         title: `Critical divergence at ${this.minutesToClock(firstFailureMinute)}`,
         detail:
           features.phoneDrift > 0
-            ? "Phone use took over before the day had a plan."
+            ? "Phone use took over before the day had a plan. What should have happened instead: the first task should have been decided before any scrolling."
             : features.avoidance > 0
-              ? "The hardest task was delayed until the day lost momentum."
-              : "Direction weakened early, which made the rest of the day reactive.",
+              ? "The hardest task was delayed until the day lost momentum. What should have happened instead: start with the hardest task while energy was still clean."
+              : "Direction weakened early, which made the rest of the day reactive. What should have happened instead: the next block should have been pre-decided.",
       },
       {
         title: "Execution degraded as the day progressed",
-        detail: "Planning debt, switching, or energy strain kept compounding instead of being reset.",
+        detail: "Planning debt, switching, or energy strain kept compounding instead of being reset. What should have happened instead: one reset should have interrupted the slide before the afternoon got heavier.",
       },
     ];
 
@@ -425,8 +425,41 @@ const analyzer = {
       {
         title: "Insert one reset before the afternoon",
         detail: "Use a deliberate midday pause to stop morning chaos from spilling into the rest of the day.",
-      },
+        },
     ];
+
+    const avoidTomorrow = [
+      features.phoneDrift > 0
+        ? {
+            title: "Do not open your phone before your day has a first task",
+            detail: "What to do instead: decide the first task, drink water, and get oriented before any scrolling starts.",
+          }
+        : null,
+      features.lateStart > 0
+        ? {
+            title: "Do not let the day begin late and unplanned",
+            detail: "What to do instead: set a realistic wake time tonight and define the first block before sleeping.",
+          }
+        : null,
+      features.contextSwitching > 0
+        ? {
+            title: "Do not bounce between tabs, tasks, or channels",
+            detail: "What to do instead: finish one clear block before switching to the next task.",
+          }
+        : null,
+      features.nutritionDebt > 0 || features.fatigue > 0
+        ? {
+            title: "Do not treat low energy like a discipline problem",
+            detail: "What to do instead: eat earlier, take one real break, and stop trying to brute-force tired work.",
+          }
+        : null,
+      !features.phoneDrift && !features.lateStart && !features.contextSwitching && !features.nutritionDebt && !features.fatigue
+        ? {
+            title: "Do not start the day reactively",
+            detail: "What to do instead: keep the first hour simple, pre-decide one priority, and protect it.",
+          }
+        : null,
+    ].filter(Boolean).slice(0, 3);
 
     const rootCauses = [
       {
@@ -454,12 +487,12 @@ const analyzer = {
       confidence,
       summary:
         features.phoneDrift > 0 && features.contextSwitching > 0
-          ? `The day likely failed at the transition from intention to execution: ${dominantSummary || "the first hour drifted"}, then the rest of the day fractured. Severity ${Math.round(severity)}/100.`
+          ? `The day likely broke at the transition from intention to execution: ${dominantSummary || "the first hour drifted"}, then the rest of the day fractured.`
           : features.lateStart > 0 && features.planningDebt > 0
-            ? `The day appears to have started behind and stayed reactive: ${dominantSummary || "a compressed start plus weak planning"} kept forcing catch-up decisions. Severity ${Math.round(severity)}/100.`
+            ? `The day appears to have started behind and stayed reactive: ${dominantSummary || "a compressed start plus weak planning"} kept forcing catch-up decisions.`
             : features.avoidance > 0
-              ? `The day seems to have broken when hard work was delayed: ${dominantSummary || "avoidance let low-value tasks fill the schedule"} and stress grew faster than progress. Severity ${Math.round(severity)}/100.`
-          : `The main pattern was ${dominantSummary || "unstable focus under rising strain"}, which turned normal work into a cascade of friction by mid to late day. Severity ${Math.round(severity)}/100.`,
+              ? `The day seems to have broken when hard work was delayed: ${dominantSummary || "avoidance let low-value tasks fill the schedule"} and stress grew faster than progress.`
+          : `The main pattern was ${dominantSummary || "unstable focus under rising strain"}, which turned normal work into a cascade of friction by mid to late day.`,
       failurePoint: {
         moment: features.phoneDrift > 0
           ? `${this.minutesToClock(firstFailureMinute)}: screen drift displaced day setup`
@@ -479,6 +512,7 @@ const analyzer = {
       wentWell,
       didntGo,
       changeTomorrow,
+      avoidTomorrow,
       timeLeaks: [
         {
           title: `Reactive screen drift (+${scrollCost} drag points)`,
@@ -774,12 +808,9 @@ const elements = {
   clearBtn: document.getElementById("clearBtn"),
   loadSampleBtn: document.getElementById("loadSampleBtn"),
   sampleList: document.getElementById("sampleList"),
-  historyList: document.getElementById("historyList"),
   historyChart: document.getElementById("historyChart"),
-  historyCountMetric: document.getElementById("historyCountMetric"),
-  avgSeverityMetric: document.getElementById("avgSeverityMetric"),
-  plannerCountMetric: document.getElementById("plannerCountMetric"),
-  trendMetric: document.getElementById("trendMetric"),
+  progressPanel: document.getElementById("progressPanel"),
+  toggleProgressBtn: document.getElementById("toggleProgressBtn"),
   clearHistoryBtn: document.getElementById("clearHistoryBtn"),
   workspaceHeading: document.getElementById("workspaceHeading"),
   autopsyModeBtn: document.getElementById("autopsyModeBtn"),
@@ -796,55 +827,32 @@ const elements = {
   highEnergyEnd: document.getElementById("highEnergyEnd"),
   lowEnergyStart: document.getElementById("lowEnergyStart"),
   lowEnergyEnd: document.getElementById("lowEnergyEnd"),
-  addTaskBtn: document.getElementById("addTaskBtn"),
-  taskList: document.getElementById("taskList"),
+  taskDump: document.getElementById("taskDump"),
   resultsHeading: document.getElementById("resultsHeading"),
   analysisStamp: document.getElementById("analysisStamp"),
-  autopsyControls: document.getElementById("autopsyControls"),
-  shortReportBtn: document.getElementById("shortReportBtn"),
-  deepReportBtn: document.getElementById("deepReportBtn"),
   autopsyResultsSection: document.getElementById("autopsyResultsSection"),
   plannerResultsSection: document.getElementById("plannerResultsSection"),
-  deepSection: document.getElementById("deepSection"),
   autopsySummary: document.getElementById("autopsySummary"),
-  severityScore: document.getElementById("severityScore"),
-  confidenceScore: document.getElementById("confidenceScore"),
   failureMoment: document.getElementById("failureMoment"),
   failureWhy: document.getElementById("failureWhy"),
-  planningDebt: document.getElementById("planningDebt"),
-  energyStrain: document.getElementById("energyStrain"),
-  timeLeakCount: document.getElementById("timeLeakCount"),
-  burnoutCount: document.getElementById("burnoutCount"),
-  timeLeaks: document.getElementById("timeLeaks"),
-  burnoutSignals: document.getElementById("burnoutSignals"),
   wentWell: document.getElementById("wentWell"),
   didntGo: document.getElementById("didntGo"),
   changeTomorrow: document.getElementById("changeTomorrow"),
+  avoidTomorrow: document.getElementById("avoidTomorrow"),
   focusAnalytics: document.getElementById("focusAnalytics"),
-  rootCauses: document.getElementById("rootCauses"),
-  behaviorPatches: document.getElementById("behaviorPatches"),
   failureTimeline: document.getElementById("failureTimeline"),
   tomorrowPlan: document.getElementById("tomorrowPlan"),
   plannerSummary: document.getElementById("plannerSummary"),
-  planQualityScore: document.getElementById("planQualityScore"),
-  focusHoursScore: document.getElementById("focusHoursScore"),
   bestStartWindow: document.getElementById("bestStartWindow"),
   bestStartWhy: document.getElementById("bestStartWhy"),
-  plannerWake: document.getElementById("plannerWake"),
-  plannerDeepWork: document.getElementById("plannerDeepWork"),
-  plannerShutdown: document.getElementById("plannerShutdown"),
   schedulePlan: document.getElementById("schedulePlan"),
   priorityPlan: document.getElementById("priorityPlan"),
   scheduleConflicts: document.getElementById("scheduleConflicts"),
   efficiencyRules: document.getElementById("efficiencyRules"),
   plannerNotes: document.getElementById("plannerNotes"),
-  trendTitle: document.getElementById("trendTitle"),
-  trendBody: document.getElementById("trendBody"),
 };
 
 let activeMode = "autopsy";
-let reportDepth = "short";
-let plannerTasks = [];
 let currentPlannerReport = null;
 
 function loadHistory() {
@@ -869,6 +877,26 @@ function formatDate(dateString) {
 }
 
 function plannerInput() {
+  const parsedTasks = analyzer
+    .splitList(elements.taskDump.value.trim())
+    .map((item) => {
+      const durationMatch = item.match(/(\d+)\s*(?:m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b/i);
+      const duration = durationMatch
+        ? /h|hr|hrs|hour|hours/i.test(durationMatch[0])
+          ? Number(durationMatch[1]) * 60
+          : Number(durationMatch[1])
+        : 60;
+      const title = item
+        .replace(/(\d+)\s*(?:m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b/i, "")
+        .replace(/[-:]+/g, " ")
+        .trim();
+      return {
+        title: title || item.trim(),
+        duration,
+      };
+    })
+    .filter((task) => task.title);
+
   return {
     wakeTime: elements.wakeTime.value,
     dayEndTime: elements.dayEndTime.value,
@@ -879,47 +907,8 @@ function plannerInput() {
     highEnergyEnd: elements.highEnergyEnd.value,
     lowEnergyStart: elements.lowEnergyStart.value,
     lowEnergyEnd: elements.lowEnergyEnd.value,
-    tasks: plannerTasks
-      .map((task) => ({
-        title: task.title.trim(),
-        duration: Number(task.duration),
-      }))
-      .filter((task) => task.title && task.duration > 0),
+    tasks: parsedTasks,
   };
-}
-
-function renderTaskInputs() {
-  elements.taskList.innerHTML = plannerTasks
-    .map(
-      (task, index) => `
-        <div class="task-row" data-task-index="${index}">
-          <label>
-            <span>Task</span>
-            <input type="text" class="task-title" value="${task.title}" placeholder="Write essay draft" />
-          </label>
-          <label>
-            <span>Duration</span>
-            <input type="number" class="task-duration" min="15" step="15" value="${task.duration}" />
-          </label>
-          <button type="button" class="small-button remove-task">Remove</button>
-        </div>
-      `
-    )
-    .join("");
-
-  document.querySelectorAll(".task-row").forEach((row) => {
-    const index = Number(row.dataset.taskIndex);
-    row.querySelector(".task-title").addEventListener("input", (event) => {
-      plannerTasks[index].title = event.target.value;
-    });
-    row.querySelector(".task-duration").addEventListener("input", (event) => {
-      plannerTasks[index].duration = Number(event.target.value || 0);
-    });
-    row.querySelector(".remove-task").addEventListener("click", () => {
-      plannerTasks.splice(index, 1);
-      renderTaskInputs();
-    });
-  });
 }
 
 function renderInsightList(container, items) {
@@ -958,30 +947,17 @@ function showLandingPage() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function setReportDepth(depth) {
-  reportDepth = depth;
-  elements.shortReportBtn.classList.toggle("active", depth === "short");
-  elements.deepReportBtn.classList.toggle("active", depth === "deep");
-  elements.deepSection.classList.toggle("hidden", depth !== "deep");
-}
-
 function renderAutopsy(report) {
   elements.resultsHeading.textContent = "Autopsy Report";
-  elements.autopsyControls.classList.remove("hidden");
   elements.autopsyResultsSection.classList.remove("hidden");
   elements.plannerResultsSection.classList.add("hidden");
   elements.autopsySummary.textContent = report.summary;
-  elements.severityScore.textContent = Math.round(report.severity);
-  elements.confidenceScore.textContent = `${Math.round(report.confidence * 100)}%`;
   elements.failureMoment.textContent = report.failurePoint.moment;
   elements.failureWhy.textContent = report.failurePoint.why;
-  elements.planningDebt.textContent = Math.round(report.metrics.planningDebt);
-  elements.energyStrain.textContent = Math.round(report.metrics.energyStrain);
-  elements.timeLeakCount.textContent = report.timeLeaks.length;
-  elements.burnoutCount.textContent = report.burnoutSignals.length;
   renderInsightList(elements.wentWell, report.wentWell);
   renderInsightList(elements.didntGo, report.didntGo);
   renderInsightList(elements.changeTomorrow, report.changeTomorrow);
+  renderInsightList(elements.avoidTomorrow, report.avoidTomorrow);
   renderInsightList(elements.focusAnalytics, [
     {
       title: "Estimated focused work",
@@ -992,29 +968,18 @@ function renderAutopsy(report) {
       detail: `${report.analytics.wastedMinutes} minutes lost to drift, friction, or scattered execution.`,
     },
   ]);
-  renderInsightList(elements.timeLeaks, report.timeLeaks);
-  renderInsightList(elements.burnoutSignals, report.burnoutSignals);
-  renderInsightList(elements.rootCauses, report.rootCauses);
-  renderInsightList(elements.behaviorPatches, report.behaviorPatches);
   renderInsightList(elements.failureTimeline, report.timeline);
   renderInsightList(elements.tomorrowPlan, report.tomorrowPlan);
-  setReportDepth(reportDepth);
 }
 
 function renderPlanner(report) {
   currentPlannerReport = report;
   elements.resultsHeading.textContent = "Tomorrow Plan";
-  elements.autopsyControls.classList.add("hidden");
   elements.autopsyResultsSection.classList.add("hidden");
   elements.plannerResultsSection.classList.remove("hidden");
   elements.plannerSummary.textContent = report.summary;
-  elements.planQualityScore.textContent = Math.round(report.planQuality);
-  elements.focusHoursScore.textContent = `${report.focusHours.toFixed(1)}h`;
   elements.bestStartWindow.textContent = report.bestStartWindow;
   elements.bestStartWhy.textContent = report.bestStartWhy;
-  elements.plannerWake.textContent = report.planner.wakeTime || "--";
-  elements.plannerDeepWork.textContent = report.bestStartWindow;
-  elements.plannerShutdown.textContent = report.shutdownTime;
   renderInsightList(elements.schedulePlan, report.suggestedSchedule);
   renderInsightList(elements.scheduleConflicts, report.scheduleConflicts);
   elements.priorityPlan.innerHTML = report.editableSchedule && report.editableSchedule.length
@@ -1079,72 +1044,17 @@ function bindScheduleAdjustments() {
 
 function renderReport(report) {
   elements.analysisStamp.textContent = `Analyzed ${formatDate(report.createdAt)}`;
-  elements.trendTitle.textContent = report.trend.title;
-  elements.trendBody.textContent = report.trend.body;
   if (report.type === "planner") renderPlanner(report);
   else renderAutopsy(report);
 }
 
 function renderHistory(history) {
-  if (!history.length) {
-    elements.historyList.innerHTML = `<div class="empty-history">Run an autopsy or planner analysis to start your visible history.</div>`;
-    return;
-  }
-
-  elements.historyList.innerHTML = history
-    .slice()
-    .reverse()
-    .map(
-      (item) => `
-        <article class="history-item" data-id="${item.id}">
-          <div class="history-meta">
-            <span>${formatDate(item.createdAt)}</span>
-            <span>${item.type === "planner" ? "Planner" : "Autopsy"}</span>
-          </div>
-          <h3>${item.summary}</h3>
-          <p class="history-excerpt">${
-            item.type === "planner"
-              ? item.planner.priorities || "No priorities entered"
-              : `${item.rawLog.slice(0, 140)}${item.rawLog.length > 140 ? "..." : ""}`
-          }</p>
-        </article>
-      `
-    )
-    .join("");
-
-  document.querySelectorAll(".history-item").forEach((node) => {
-    node.addEventListener("click", () => {
-      const report = loadHistory().find((item) => item.id === node.dataset.id);
-      if (!report) return;
-      if (report.planner) {
-        elements.wakeTime.value = report.planner.wakeTime || "07:30";
-        elements.dayEndTime.value = report.planner.dayEndTime || "22:30";
-        elements.fixedSchedule.value = report.planner.schedule || "";
-        elements.priorities.value = report.planner.priorities || "";
-        elements.energyHoursSection.classList.toggle("hidden", !report.planner.useEnergyHours);
-        elements.toggleEnergyBtn.textContent = report.planner.useEnergyHours ? "Hide Energy Hours" : "Add High-Energy Hours";
-        elements.highEnergyStart.value = report.planner.highEnergyStart || "08:00";
-        elements.highEnergyEnd.value = report.planner.highEnergyEnd || "12:00";
-        elements.lowEnergyStart.value = report.planner.lowEnergyStart || "15:00";
-        elements.lowEnergyEnd.value = report.planner.lowEnergyEnd || "17:30";
-        plannerTasks = report.planner.tasks ? report.planner.tasks.map((task) => ({ ...task })) : [];
-        renderTaskInputs();
-      }
-      if (report.rawLog) elements.dayLog.value = report.rawLog;
-      setMode(report.type);
-      renderReport(report);
-      showResultsPage();
-    });
-  });
+  elements.toggleProgressBtn.textContent = history.length ? "Show Progress" : "No Progress Yet";
 }
 
 function renderHistoryChart(history) {
   if (!history.length) {
     elements.historyChart.innerHTML = `<div class="chart-empty">No chart yet. Run a few analyses to build a 2-week view.</div>`;
-    elements.historyCountMetric.textContent = "0";
-    elements.avgSeverityMetric.textContent = "0";
-    elements.plannerCountMetric.textContent = "0";
-    elements.trendMetric.textContent = "Stable";
     return;
   }
 
@@ -1194,23 +1104,6 @@ function renderHistoryChart(history) {
     </svg>
   `;
 
-  const autopsies = history.filter((item) => item.type === "autopsy");
-  const planners = history.filter((item) => item.type === "planner");
-  const avgSeverity =
-    autopsies.length > 0
-      ? Math.round(autopsies.reduce((sum, item) => sum + item.severity, 0) / autopsies.length)
-      : 0;
-  const trendDirection =
-    autopsies.length >= 2 && autopsies[autopsies.length - 1].severity < autopsies[0].severity
-      ? "Improving"
-      : planners.length > 1
-        ? "More Planned"
-        : "Stable";
-
-  elements.historyCountMetric.textContent = String(history.length);
-  elements.avgSeverityMetric.textContent = String(avgSeverity);
-  elements.plannerCountMetric.textContent = String(planners.length);
-  elements.trendMetric.textContent = trendDirection;
 }
 
 function runAnalysis() {
@@ -1254,8 +1147,7 @@ function loadSample(index = 0) {
   elements.lowEnergyEnd.value = sample.lowEnd;
   elements.fixedSchedule.value = sample.schedule;
   elements.priorities.value = sample.priorities;
-  plannerTasks = sample.tasks.map((task) => ({ ...task }));
-  renderTaskInputs();
+  elements.taskDump.value = sample.tasks.map((task) => `${task.title} ${task.duration} min`).join(", ");
   setMode("autopsy");
   document.getElementById("planner").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1297,33 +1189,33 @@ elements.clearBtn.addEventListener("click", () => {
   elements.dayLog.value = "";
   elements.fixedSchedule.value = "";
   elements.priorities.value = "";
+  elements.taskDump.value = "";
   elements.energyHoursSection.classList.add("hidden");
-  elements.toggleEnergyBtn.textContent = "Add High-Energy Hours";
+  elements.toggleEnergyBtn.textContent = "Yes, add them";
   elements.highEnergyStart.value = "08:00";
   elements.highEnergyEnd.value = "12:00";
   elements.lowEnergyStart.value = "15:00";
   elements.lowEnergyEnd.value = "17:30";
-  plannerTasks = [];
-  renderTaskInputs();
   elements.wakeTime.value = "07:30";
   elements.dayEndTime.value = "22:30";
-});
-elements.addTaskBtn.addEventListener("click", () => {
-  plannerTasks.push({ title: "", duration: 60 });
-  renderTaskInputs();
 });
 elements.toggleEnergyBtn.addEventListener("click", () => {
   const shouldHide = !elements.energyHoursSection.classList.contains("hidden");
   elements.energyHoursSection.classList.toggle("hidden", shouldHide);
-  elements.toggleEnergyBtn.textContent = shouldHide ? "Add High-Energy Hours" : "Hide Energy Hours";
+  elements.toggleEnergyBtn.textContent = shouldHide ? "Yes, add them" : "Hide Energy Hours";
 });
 elements.loadSampleBtn.addEventListener("click", () => loadSample(0));
-elements.shortReportBtn.addEventListener("click", () => setReportDepth("short"));
-elements.deepReportBtn.addEventListener("click", () => setReportDepth("deep"));
+elements.toggleProgressBtn.addEventListener("click", () => {
+  const shouldShow = elements.progressPanel.classList.contains("hidden");
+  elements.progressPanel.classList.toggle("hidden", !shouldShow);
+  elements.toggleProgressBtn.textContent = shouldShow ? "Hide Progress" : "Show Progress";
+});
 elements.clearHistoryBtn.addEventListener("click", () => {
   localStorage.removeItem(STORAGE_KEY);
   renderHistory([]);
   renderHistoryChart([]);
+  elements.progressPanel.classList.add("hidden");
+  elements.toggleProgressBtn.textContent = "No Progress Yet";
 });
 elements.dayLog.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -1332,10 +1224,7 @@ elements.dayLog.addEventListener("keydown", (event) => {
 });
 
 renderSamples();
-plannerTasks = [{ title: "", duration: 60 }];
-renderTaskInputs();
 const initialHistory = loadHistory();
 renderHistory(initialHistory);
 renderHistoryChart(initialHistory);
 setMode("autopsy");
-setReportDepth("short");
